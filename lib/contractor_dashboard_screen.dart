@@ -215,12 +215,17 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
                         Icons.person_outline,
                         color: Colors.white70,
                       ),
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ProfileScreen(isManager: false),
-                        ),
-                      ),
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                const ProfileScreen(isManager: false),
+                          ),
+                        );
+                        // أعد تحميل التاق والبيانات بعد الرجوع
+                        _checkAuth();
+                      },
                     ),
                   ],
                 ),
