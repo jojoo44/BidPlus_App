@@ -17,28 +17,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _companyController = TextEditingController();
-  final _specializationController = TextEditingController();
 
-  String? _selectedTag;
   bool _isLoading = false;
 
+  // أخطاء لكل حقل
   String? _nameError;
   String? _emailError;
   String? _phoneError;
   String? _passwordError;
-  String? _specializationError;
-
-  // التاقز المتاحة
-  final List<Map<String, String>> _tags = [
-    {'label': 'بناء وتشييد', 'value': 'construction'},
-    {'label': 'هندسة', 'value': 'engineering'},
-    {'label': 'تقنية معلومات', 'value': 'it'},
-    {'label': 'تصميم', 'value': 'design'},
-    {'label': 'صيانة', 'value': 'maintenance'},
-    {'label': 'استشارات', 'value': 'consulting'},
-    {'label': 'لوجستيات', 'value': 'logistics'},
-    {'label': 'أخرى', 'value': 'other'},
-  ];
 
   @override
   void dispose() {
@@ -47,21 +33,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _phoneController.dispose();
     _passwordController.dispose();
     _companyController.dispose();
-    _specializationController.dispose();
     super.dispose();
   }
 
+  // ============================================
+  // 1. التحقق من صحة المدخلات
+  // ============================================
   bool _validateInputs() {
     setState(() {
       _nameError = null;
       _emailError = null;
       _phoneError = null;
       _passwordError = null;
-      _specializationError = null;
     });
 
     bool isValid = true;
 
+    // الاسم
     if (_nameController.text.trim().isEmpty) {
       setState(() => _nameError = 'Full name is required.');
       isValid = false;
@@ -70,6 +58,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       isValid = false;
     }
 
+    // الإيميل
     final emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$');
     if (_emailController.text.trim().isEmpty) {
       setState(() => _emailError = 'Email is required.');
@@ -79,6 +68,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       isValid = false;
     }
 
+    // رقم الجوال
     if (_phoneController.text.trim().isEmpty) {
       setState(() => _phoneError = 'Phone number is required.');
       isValid = false;
@@ -87,6 +77,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       isValid = false;
     }
 
+    // كلمة المرور
     if (_passwordController.text.isEmpty) {
       setState(() => _passwordError = 'Password is required.');
       isValid = false;
@@ -97,25 +88,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
       isValid = false;
     }
 
-    // للكونتراكتور فقط
-    if (widget.role != 'Manager') {
-      if (_specializationController.text.trim().isEmpty) {
-        setState(
-          () => _specializationError = 'Please describe your specialization.',
-        );
-        isValid = false;
-      }
-      if (_selectedTag == null) {
-        setState(() => _specializationError = 'Please select a field.');
-        isValid = false;
-      }
-    }
-
     return isValid;
   }
 
+  // ============================================
+  // 2. دالة التسجيل مع معالجة الأخطاء
+  // ============================================
   Future<void> _signUp() async {
+    // تحقق من المدخلات أولاً
     if (!_validateInputs()) return;
+
     setState(() => _isLoading = true);
 
     try {
@@ -130,17 +112,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       if (res.user == null) throw Exception('Signup failed. Please try again.');
 
-      // تحديث بيانات المستخدم
-      final updateData = <String, dynamic>{
-        'contactInfo': _phoneController.text.trim(),
-      };
-
-      if (widget.role != 'Manager') {
-        updateData['specialization'] = _specializationController.text.trim();
-        updateData['specializationTag'] = _selectedTag;
-      }
-
-      await supabase.from('User').update(updateData).eq('id', res.user!.id);
+      await supabase
+          .from('User')
+          .update({'contactInfo': _phoneController.text.trim()})
+          .eq('id', res.user!.id);
 
       if (mounted) {
         Navigator.push(
@@ -154,9 +129,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
         );
       }
     } on AuthException catch (e) {
+      // ============================================
+      // 2. معالجة أخطاء Supabase Auth
+      // ============================================
       final msg = e.message.toLowerCase();
+
       if (msg.contains('already registered') ||
-          msg.contains('already exists')) {
+          msg.contains('already exists') ||
+          msg.contains('user already')) {
+        // إيميل مسجّل مسبقاً
         setState(
           () => _emailError =
               'Email already exists. Please log in or use a different email.',
@@ -188,9 +169,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
+  // ============================================
+  // UI
+  // ============================================
   @override
   Widget build(BuildContext context) {
-    final isManager = widget.role == 'Manager';
+    final isManager = widget.role == "Manager";
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B0E14),
@@ -204,7 +188,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         child: Column(
           children: [
             Text(
-              isManager ? 'Manager' : 'Sign Up',
+              isManager ? "Manager" : "Sign Up",
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 28,
@@ -212,120 +196,52 @@ class _SignUpScreenState extends State<SignUpScreen> {
               ),
             ),
             Text(
-              isManager ? 'Sign up' : 'Contractor',
+              isManager ? "Sign up" : "Contractor",
               style: const TextStyle(color: Colors.grey, fontSize: 16),
             ),
             const SizedBox(height: 40),
 
-            _buildLabel('Full Name'),
+            _buildLabel("Full Name"),
             _buildInput(
-              'e.g., Sarah Miller',
+              "e.g., Sarah Miller",
               controller: _nameController,
               errorText: _nameError,
             ),
 
-            _buildLabel(isManager ? 'Work Email Address' : 'Email Address'),
+            _buildLabel(isManager ? "Work Email Address" : "Email Address"),
             _buildInput(
-              'john@example.com',
+              "john@example.com",
               controller: _emailController,
               errorText: _emailError,
             ),
 
-            _buildLabel('Phone Number'),
+            _buildLabel("Phone Number"),
             _buildInput(
-              '(123) 456-7890',
+              "(123) 456-7890",
               controller: _phoneController,
               errorText: _phoneError,
               keyboardType: TextInputType.phone,
             ),
 
-            _buildLabel('Create Password'),
+            _buildLabel("Create Password"),
             _buildInput(
-              'Secure input',
+              "Secure input",
               isPass: true,
               controller: _passwordController,
               errorText: _passwordError,
             ),
 
             if (isManager) ...[
-              _buildLabel('Company Name'),
-              _buildInput('e.g., Acme Corp.', controller: _companyController),
+              _buildLabel("Company Name"),
+              _buildInput("e.g., Acme Corp.", controller: _companyController),
             ],
 
-            // ============================================
-            // قسم التخصص — للكونتراكتور فقط
-            // ============================================
             if (!isManager) ...[
-              const SizedBox(height: 10),
-              _buildLabel('Your Specialization'),
-              _buildInput(
-                'e.g., Civil Engineering, Catering, IT Support...',
-                controller: _specializationController,
-                errorText: _specializationError,
-              ),
-
-              const SizedBox(height: 12),
-              _buildLabel('Field / Category'),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _tags.map((tag) {
-                  final isSelected = _selectedTag == tag['value'];
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedTag = tag['value']),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? const Color(0xFF5D78FF)
-                            : const Color(0xFF161B22),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isSelected
-                              ? const Color(0xFF5D78FF)
-                              : Colors.grey.withOpacity(0.2),
-                        ),
-                      ),
-                      child: Text(
-                        tag['label']!,
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.grey,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              if (_specializationError != null) ...[
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.error_outline,
-                      color: Colors.redAccent,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      _specializationError!,
-                      style: const TextStyle(
-                        color: Colors.redAccent,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-
               const SizedBox(height: 10),
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'Showcase Your Work',
+                  "Showcase Your Work",
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -338,16 +254,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   Expanded(
                     child: _buildActionBtn(
                       Icons.file_upload_outlined,
-                      'Upload Files',
+                      "Upload Files",
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Expanded(child: _buildActionBtn(Icons.link, 'Add Link')),
+                  Expanded(child: _buildActionBtn(Icons.link, "Add Link")),
                 ],
               ),
             ],
 
             const SizedBox(height: 40),
+
             SizedBox(
               width: double.infinity,
               height: 55,
@@ -362,7 +279,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 child: _isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
                     : const Text(
-                        'Sign Up',
+                        "Sign Up",
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -378,6 +295,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
+  // ============================================
+  // Widgets مساعدة
+  // ============================================
   Widget _buildLabel(String label) => Padding(
     padding: const EdgeInsets.only(bottom: 8, top: 15),
     child: Align(
@@ -403,13 +323,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
         obscureText: isPass,
         keyboardType: keyboardType,
         style: const TextStyle(color: Colors.white),
-        onChanged: (_) => setState(() {
-          _nameError = null;
-          _emailError = null;
-          _phoneError = null;
-          _passwordError = null;
-          _specializationError = null;
-        }),
+        // يمسح الـ error لما يبدأ يكتب
+        onChanged: (_) {
+          if (errorText != null)
+            setState(() {
+              _nameError = null;
+              _emailError = null;
+              _phoneError = null;
+              _passwordError = null;
+            });
+        },
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
@@ -429,6 +352,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           ),
         ),
       ),
+      // رسالة الخطأ تحت الحقل
       if (errorText != null) ...[
         const SizedBox(height: 5),
         Row(
