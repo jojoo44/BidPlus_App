@@ -6,7 +6,6 @@ import '../main.dart';
 class CreateRFPScreen extends StatefulWidget {
   final String? initialTitle;
   final String? initialBudget;
-
   const CreateRFPScreen({super.key, this.initialTitle, this.initialBudget});
 
   @override
@@ -22,12 +21,11 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
   late TextEditingController budgetController;
   late TextEditingController descriptionController;
   late TextEditingController deadlineController;
+  final TextEditingController _requiredSpecController = TextEditingController();
 
+  String? _selectedRequiredTag;
   bool _isLoading = false;
 
-  // ============================================
-  // متغيرات الملفات
-  // ============================================
   final List<PlatformFile> _pickedFiles = [];
   final List<String> _uploadedUrls = [];
   bool _isUploadingFile = false;
@@ -49,6 +47,17 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
     TextEditingController(text: "60"),
   ];
 
+  final List<Map<String, String>> _tags = [
+    {"label": "Construction", "value": "construction"},
+    {"label": "Engineering", "value": "engineering"},
+    {"label": "IT & Software", "value": "it"},
+    {"label": "Design", "value": "design"},
+    {"label": "Maintenance", "value": "maintenance"},
+    {"label": "Consulting", "value": "consulting"},
+    {"label": "Logistics", "value": "logistics"},
+    {"label": "Other", "value": "other"},
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -64,9 +73,8 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
     budgetController.dispose();
     descriptionController.dispose();
     deadlineController.dispose();
-    for (var c in weightControllers) {
-      c.dispose();
-    }
+    _requiredSpecController.dispose();
+    for (var c in weightControllers) c.dispose();
     super.dispose();
   }
 
@@ -80,156 +88,136 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
     );
     if (picked != null) {
       deadlineController.text =
-          "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+          "${picked.year}-${picked.month.toString().padLeft(2, "0")}-${picked.day.toString().padLeft(2, "0")}";
     }
   }
 
-  // ============================================
-  // رفع الملفات — متوافق مع Web و Mobile
-  // ============================================
   Future<void> _pickAndUploadFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'doc', 'docx', 'png', 'jpg', 'jpeg'],
+      allowedExtensions: ["pdf", "doc", "docx", "png", "jpg", "jpeg"],
       allowMultiple: true,
-      withData: true, // ← مهم على Web
+      withData: true,
     );
-
     if (result == null || result.files.isEmpty) return;
-
     setState(() => _isUploadingFile = true);
-
     try {
       for (final file in result.files) {
-        // على Web نستخدم bytes بدل path
         final fileBytes = file.bytes;
         if (fileBytes == null) continue;
-
         final userId = supabase.auth.currentUser!.id;
-        // اسم فريد يمنع التكرار
         final fileName =
-            '$userId/${DateTime.now().millisecondsSinceEpoch}_${file.name}';
-
-        // رفع الملف لـ Supabase Storage
+            "$userId/${DateTime.now().millisecondsSinceEpoch}_${file.name}";
         await supabase.storage
-            .from('rfp-attachments')
+            .from("rfp-attachments")
             .uploadBinary(fileName, fileBytes);
-
-        // جيب الرابط العام
         final publicUrl = supabase.storage
-            .from('rfp-attachments')
+            .from("rfp-attachments")
             .getPublicUrl(fileName);
-
         setState(() {
           _pickedFiles.add(file);
           _uploadedUrls.add(publicUrl);
         });
       }
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Files uploaded!'),
+          content: Text("Files uploaded!"),
           backgroundColor: Colors.green,
         ),
       );
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+      ).showSnackBar(SnackBar(content: Text("Upload failed: $e")));
     } finally {
       setState(() => _isUploadingFile = false);
     }
   }
 
-  void _removeFile(int index) {
-    setState(() {
-      _pickedFiles.removeAt(index);
-      _uploadedUrls.removeAt(index);
-    });
-  }
+  void _removeFile(int index) => setState(() {
+    _pickedFiles.removeAt(index);
+    _uploadedUrls.removeAt(index);
+  });
 
-  // ============================================
-  // حفظ الـ RFP + الملفات في Supabase
-  // ============================================
   Future<void> _createRFP() async {
-    // التحقق من كل الحقول المطلوبة
     if (titleController.text.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Please enter RFP Title')));
+      ).showSnackBar(const SnackBar(content: Text("Please enter RFP Title")));
       return;
     }
     if (descriptionController.text.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Please enter Description')));
+      ).showSnackBar(const SnackBar(content: Text("Please enter Description")));
       return;
     }
     if (deadlineController.text.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Please select a Due Date')));
+      ).showSnackBar(const SnackBar(content: Text("Please select a Due Date")));
       return;
     }
     if (budgetController.text.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Please enter Budget')));
+      ).showSnackBar(const SnackBar(content: Text("Please enter Budget")));
       return;
     }
     if (criteriaList.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Please add at least one Evaluation Criterion'),
+          content: Text("Please add at least one Evaluation Criterion"),
         ),
       );
       return;
     }
 
     setState(() => _isLoading = true);
-
     try {
       final userId = supabase.auth.currentUser!.id;
-
       final criteriaJson = criteriaList
           .asMap()
           .entries
-          .map((e) => '${e.value["name"]}:${weightControllers[e.key].text}%')
-          .join(', ');
+          .map((e) => "${e.value["name"]}:${weightControllers[e.key].text}%")
+          .join(", ");
 
-      // 1. حفظ الـ RFP
-      final rfpResponse = await supabase
-          .from('RFP')
+      await supabase
+          .from("RFP")
           .insert({
-            'title': titleController.text.trim(),
-            'description': descriptionController.text.trim(),
-            'budget': double.tryParse(budgetController.text) ?? 0,
-            'deadline': deadlineController.text.isEmpty
+            "title": titleController.text.trim(),
+            "description": descriptionController.text.trim(),
+            "budget": double.tryParse(budgetController.text) ?? 0,
+            "deadline": deadlineController.text.isEmpty
                 ? null
                 : deadlineController.text,
-            'status': 'Draft',
-            'evaluationCriteria': criteriaJson,
-            'creatorUser': userId,
-            'creationDate': DateTime.now().toIso8601String().split('T')[0],
+            "status": "Draft",
+            "evaluationCriteria": criteriaJson,
+            "creatorUser": userId,
+            "creationDate": DateTime.now().toIso8601String().split("T")[0],
+            "requiredSpecialization":
+                _requiredSpecController.text.trim().isEmpty
+                ? null
+                : _requiredSpecController.text.trim(),
+            "requiredTag": _selectedRequiredTag,
           })
-          .select('rfpID')
+          .select("rfpID")
           .single();
 
-      // 2. حفظ الملفات في جدول Document
       for (int i = 0; i < _pickedFiles.length; i++) {
-        await supabase.from('Document').insert({
-          'fullName': _pickedFiles[i].name,
-          'fileURL': _uploadedUrls[i],
-          'uploadDate': DateTime.now().toIso8601String().split('T')[0],
-          'uploader': userId,
-          'uploadType': 'RFP_Attachment',
+        await supabase.from("Document").insert({
+          "fullName": _pickedFiles[i].name,
+          "fileURL": _uploadedUrls[i],
+          "uploadDate": DateTime.now().toIso8601String().split("T")[0],
+          "uploader": userId,
+          "uploadType": "RFP_Attachment",
         });
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('RFP created!'),
+            content: Text("RFP created!"),
             backgroundColor: Colors.green,
           ),
         );
@@ -238,19 +226,16 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
     } on PostgrestException catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.message}')));
+      ).showSnackBar(SnackBar(content: Text("Error: ${e.message}")));
     } catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ).showSnackBar(SnackBar(content: Text("Error: $e")));
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  // ============================================
-  // الـ UI
-  // ============================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -263,7 +248,7 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'New RFP',
+          "New RFP",
           style: TextStyle(color: Colors.white, fontSize: 18),
         ),
         centerTitle: true,
@@ -303,6 +288,52 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
               keyboardType: TextInputType.number,
             ),
 
+            // ============================================
+            // التخصص المطلوب
+            // ============================================
+            const SizedBox(height: 8),
+            _buildLabel("Required Specialization (Optional)"),
+            _buildTextField(
+              "e.g., Civil Engineering, Software Developer...",
+              controller: _requiredSpecController,
+            ),
+
+            const SizedBox(height: 12),
+            _buildLabel("Field / Category (Optional)"),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _tags.map((tag) {
+                final isSelected = _selectedRequiredTag == tag["value"];
+                return GestureDetector(
+                  onTap: () => setState(
+                    () =>
+                        _selectedRequiredTag = isSelected ? null : tag["value"],
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected ? primaryBlue : fieldColor,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isSelected ? primaryBlue : Colors.white12,
+                      ),
+                    ),
+                    child: Text(
+                      tag["label"]!,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.grey,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+
             const SizedBox(height: 20),
             _buildLabel("Evaluation Criteria"),
             ...criteriaList.asMap().entries.map((entry) {
@@ -338,34 +369,25 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
             }),
 
             GestureDetector(
-              onTap: () {
-                setState(() {
-                  criteriaList.add({"name": "Cost", "weight": "0"});
-                  weightControllers.add(TextEditingController(text: "0"));
-                });
-              },
+              onTap: () => setState(() {
+                criteriaList.add({"name": "Cost", "weight": "0"});
+                weightControllers.add(TextEditingController(text: "0"));
+              }),
               child: _buildDashedButton("+ Add Criterion"),
             ),
 
-            // ============================================
-            // Attachments Section
-            // ============================================
             const SizedBox(height: 20),
             _buildLabel("Attachments"),
-
-            // عرض الملفات المرفوعة
             ..._pickedFiles.asMap().entries.map((entry) {
               final idx = entry.key;
               final file = entry.value;
-              final sizeKB = (file.size / 1024).toStringAsFixed(1);
               return _buildUploadedFileTile(
                 file.name,
-                '$sizeKB KB',
+                "${(file.size / 1024).toStringAsFixed(1)} KB",
                 () => _removeFile(idx),
               );
             }),
 
-            // زر رفع الملفات
             GestureDetector(
               onTap: _isUploadingFile ? null : _pickAndUploadFile,
               child: Container(
@@ -434,9 +456,6 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
     );
   }
 
-  // ============================================
-  // Widgets المساعدة
-  // ============================================
   Widget _buildLabel(String text) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 8),
     child: Text(
