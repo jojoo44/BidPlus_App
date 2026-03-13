@@ -5,7 +5,7 @@ import 'contractor_bids_screen.dart';
 import 'contractor_tasks_screen.dart';
 import 'contractor_notifications_screen.dart';
 import 'contractor_negotiation_screen.dart';
-import 'contractor_rfp_details_screen.dart'; // شاشة تفاصيل RFP للكونتراكتور
+import 'contractor_rfp_details_screen.dart';
 import 'profile_screen.dart';
 import 'login_screen.dart';
 import '../main.dart';
@@ -21,10 +21,8 @@ class ContractorDashboardScreen extends StatefulWidget {
 class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
   int _selectedIndex = 0;
   String _username = 'Contractor';
+  String? _userTag; // تاق الكونتراكتور
 
-  // ============================================
-  // بيانات حقيقية من Supabase
-  // ============================================
   List<Map<String, dynamic>> _publishedRFPs = [];
   bool _isLoadingRFPs = true;
 
@@ -34,7 +32,6 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
   void initState() {
     super.initState();
     _checkAuth();
-    _loadPublishedRFPs();
     _subscribeRealtime();
   }
 
@@ -44,9 +41,7 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
     super.dispose();
   }
 
-  // ============================================
-  // التحقق من الصلاحية
-  // ============================================
+  // جيب بيانات المستخدم + تاقه ثم حمّل الـ RFPs
   Future<void> _checkAuth() async {
     final user = supabase.auth.currentUser;
     if (user == null) {
@@ -60,7 +55,7 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
 
     final data = await supabase
         .from('User')
-        .select('role, username')
+        .select('role, username, specializationTag')
         .eq('id', user.id)
         .single();
 
@@ -72,19 +67,26 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
       return;
     }
 
-    if (mounted) setState(() => _username = data['username'] ?? 'Contractor');
+    if (mounted) {
+      setState(() {
+        _username = data['username'] ?? 'Contractor';
+        _userTag = data['specializationTag'];
+      });
+      _loadPublishedRFPs(); // حمّل بعد ما نعرف التاق
+    }
   }
 
-  // ============================================
-  // جيب الـ RFPs المنشورة
-  // ============================================
+  // جيب الـ RFPs حسب التاق
   Future<void> _loadPublishedRFPs() async {
     try {
-      final data = await supabase
-          .from('RFP')
-          .select()
-          .eq('status', 'Published')
-          .order('creationDate', ascending: false);
+      dynamic query = supabase.from('RFP').select().eq('status', 'Published');
+
+      // لو عنده تاق — فلتر، لو ما عنده — عرض الكل
+      if (_userTag != null && _userTag!.isNotEmpty) {
+        query = query.or('requiredTag.eq.$_userTag,requiredTag.is.null');
+      }
+
+      final data = await query.order('creationDate', ascending: false);
 
       if (mounted) {
         setState(() {
@@ -97,9 +99,6 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
     }
   }
 
-  // ============================================
-  // Realtime — يتحدث عند نشر RFP جديد
-  // ============================================
   void _subscribeRealtime() {
     _realtimeChannel = supabase
         .channel('contractor_rfp_realtime')
@@ -112,13 +111,9 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
         .subscribe();
   }
 
-  // ============================================
-  // UI
-  // ============================================
   @override
   Widget build(BuildContext context) {
     const bg = Color(0xFF12141D);
-
     return Scaffold(
       backgroundColor: bg,
       body: _selectedIndex == 0
@@ -168,13 +163,38 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Welcome, $_username',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Welcome, $_username',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    // عرض التاق الحالي
+                    if (_userTag != null)
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _userTag!,
+                          style: const TextStyle(
+                            color: Colors.blue,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 Row(
                   children: [
@@ -239,9 +259,7 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
 
             const SizedBox(height: 30),
 
-            // ============================================
-            // New Bids — بيانات حقيقية من Supabase
-            // ============================================
+            // New Bids
             Row(
               children: [
                 const Text(
@@ -253,7 +271,6 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
                   ),
                 ),
                 const Spacer(),
-                // بادج عدد الـ RFPs المتاحة
                 if (_publishedRFPs.isNotEmpty)
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -271,6 +288,17 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
                   ),
               ],
             ),
+
+            // تلميح للفلترة
+            if (_userTag != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6, bottom: 4),
+                child: Text(
+                  'Showing RFPs matching your field: $_userTag',
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ),
+
             const SizedBox(height: 15),
 
             _isLoadingRFPs
@@ -297,7 +325,7 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
                         ),
                         SizedBox(height: 8),
                         Text(
-                          'No available RFPs right now',
+                          'No available RFPs for your specialization',
                           style: TextStyle(color: Colors.grey),
                         ),
                       ],
@@ -313,6 +341,7 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
                               title: rfp['title'] ?? 'Untitled',
                               deadline: rfp['deadline'] ?? '—',
                               budget: rfp['budget'],
+                              tag: rfp['requiredTag'],
                               onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -379,34 +408,32 @@ class _QuickActionCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A2C47),
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: Colors.blue.withOpacity(0.3)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: iconColor, size: 20),
-            const SizedBox(width: 12),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A2C47),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.blue.withOpacity(0.3)),
       ),
-    );
-  }
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: iconColor, size: 20),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _ProjectCard extends StatelessWidget {
@@ -421,54 +448,52 @@ class _ProjectCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 250,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E212A),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+  Widget build(BuildContext context) => Container(
+    width: 250,
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: const Color(0xFF1E212A),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              progressText,
+              style: const TextStyle(color: Colors.grey, fontSize: 13),
             ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                progressText,
-                style: const TextStyle(color: Colors.grey, fontSize: 13),
-              ),
-              const SizedBox(height: 10),
-              LinearProgressIndicator(
-                value: progress,
-                backgroundColor: Colors.white10,
-                color: Colors.blue,
-                borderRadius: BorderRadius.circular(5),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+            const SizedBox(height: 10),
+            LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.white10,
+              color: Colors.blue,
+              borderRadius: BorderRadius.circular(5),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
 }
 
-// ← عُدّل عشان يعرض بيانات حقيقية ويوجّه للتفاصيل
 class _BidRow extends StatelessWidget {
   final String rfpId;
   final String title;
   final String deadline;
   final dynamic budget;
+  final String? tag;
   final VoidCallback onTap;
 
   const _BidRow({
@@ -477,67 +502,83 @@ class _BidRow extends StatelessWidget {
     required this.deadline,
     required this.budget,
     required this.onTap,
+    this.tag,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A2C47),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade900.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.work_outline,
-                color: Colors.blue.shade300,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Deadline: $deadline',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.white.withOpacity(0.5),
-                    ),
-                  ),
-                  if (budget != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      'Budget: \$$budget',
-                      style: const TextStyle(fontSize: 12, color: Colors.blue),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const Icon(Icons.arrow_forward_ios, color: Colors.blue, size: 14),
-          ],
-        ),
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A2C47),
+        borderRadius: BorderRadius.circular(12),
       ),
-    );
-  }
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade900.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.work_outline,
+              color: Colors.blue.shade300,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Deadline: $deadline',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withOpacity(0.5),
+                  ),
+                ),
+                if (budget != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Budget: \$$budget',
+                    style: const TextStyle(fontSize: 12, color: Colors.blue),
+                  ),
+                ],
+                if (tag != null) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      tag!,
+                      style: const TextStyle(color: Colors.blue, fontSize: 11),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const Icon(Icons.arrow_forward_ios, color: Colors.blue, size: 14),
+        ],
+      ),
+    ),
+  );
 }
