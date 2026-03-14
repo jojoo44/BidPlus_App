@@ -1,9 +1,109 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../main.dart';
 
-class EditProfileScreen extends StatelessWidget {
+class EditProfileScreen extends StatefulWidget {
   final bool isManager;
+  final String initialName;
+  final String initialEmail;
+  final String initialContact;
+  final String initialCompany;
 
-  const EditProfileScreen({super.key, required this.isManager});
+  const EditProfileScreen({
+    super.key,
+    required this.isManager,
+    this.initialName = '',
+    this.initialEmail = '',
+    this.initialContact = '',
+    this.initialCompany = '',
+  });
+
+  @override
+  State<EditProfileScreen> createState() => _EditProfileScreenState();
+}
+
+class _EditProfileScreenState extends State<EditProfileScreen> {
+  late final TextEditingController _nameController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _contactController;
+  late final TextEditingController _companyController;
+  bool _isSaving = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.initialName);
+    _emailController = TextEditingController(text: widget.initialEmail);
+    _contactController = TextEditingController(text: widget.initialContact);
+    _companyController = TextEditingController(text: widget.initialCompany);
+    _loadExtraData();
+  }
+
+  Future<void> _loadExtraData() async {
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+      final data = await supabase
+          .from('User')
+          .select('phoneNumber, companyName')
+          .eq('id', userId)
+          .single();
+      if (mounted) {
+        setState(() {
+          _contactController.text = data['phoneNumber'] ?? '';
+          _companyController.text = data['companyName'] ?? '';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _contactController.dispose();
+    _companyController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveChanges() async {
+    setState(() => _isSaving = true);
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      await supabase
+          .from('User')
+          .update({
+            'username': _nameController.text.trim(),
+            'phoneNumber': _contactController.text.trim(),
+            'companyName': _companyController.text.trim(),
+          })
+          .eq('id', userId);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile updated successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -11,10 +111,11 @@ class EditProfileScreen extends StatelessWidget {
       backgroundColor: const Color(0xFF12141D),
       appBar: AppBar(
         title: Text(
-          isManager ? "Edit Account Manager" : "Edit Account Contractor",
+          widget.isManager ? "Edit Account Manager" : "Edit Account Contractor",
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -23,10 +124,14 @@ class EditProfileScreen extends StatelessWidget {
             Center(
               child: Column(
                 children: [
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 45,
-                    backgroundImage: NetworkImage(
-                      'https://via.placeholder.com/150',
+                    backgroundColor: Colors.deepPurple,
+                    child: Text(
+                      widget.initialName.isNotEmpty
+                          ? widget.initialName[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(color: Colors.white, fontSize: 32),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -44,22 +149,39 @@ class EditProfileScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 30),
-            _buildTextField("Full Name", "Jane Doe"),
-            _buildTextField("Email Address", "jane.doe@example.com"),
+
+            _buildTextField(
+              "Full Name",
+              "Jane Doe",
+              controller: _nameController,
+            ),
+            _buildTextField(
+              "Email Address",
+              "jane.doe@example.com",
+              controller: _emailController,
+              readOnly: true,
+            ),
             _buildTextField(
               "Phone Number",
               "Enter your phone number",
-              isError: true,
+              controller: _contactController,
             ),
-            if (isManager)
-              _buildTextField("Company Name", "Creative Solutions Inc."),
-            if (!isManager) ...[
+
+            if (widget.isManager)
+              _buildTextField(
+                "Company Name",
+                "Creative Solutions Inc.",
+                controller: _companyController,
+              ),
+
+            if (!widget.isManager) ...[
               _buildDropdownField("Professional Specialization", "Plumbing"),
               const SizedBox(height: 20),
               _buildSectionLabel("Update Documents"),
               _buildFileTile("BusinessLicense.pdf"),
               _buildFileTile("LiabilityInsurance.pdf"),
             ],
+
             const SizedBox(height: 40),
             SizedBox(
               width: double.infinity,
@@ -71,14 +193,16 @@ class EditProfileScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  "Save Changes",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                onPressed: _isSaving ? null : _saveChanges,
+                child: _isSaving
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
+                        "Save Changes",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
           ],
@@ -87,7 +211,13 @@ class EditProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTextField(String label, String hint, {bool isError = false}) {
+  Widget _buildTextField(
+    String label,
+    String hint, {
+    required TextEditingController controller,
+    bool isError = false,
+    bool readOnly = false,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
@@ -99,17 +229,25 @@ class EditProfileScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           TextField(
+            controller: controller,
+            readOnly: readOnly,
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: const TextStyle(color: Colors.grey),
               filled: true,
-              fillColor: const Color(0xFF1E212A),
+              fillColor: readOnly
+                  ? const Color(0xFF161920)
+                  : const Color(0xFF1E212A),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(
                   color: isError ? Colors.red : Colors.transparent,
                 ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.blue),
               ),
             ),
           ),

@@ -24,9 +24,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadProfile();
   }
 
-  // ============================================
-  // جيب بيانات المستخدم من Supabase
-  // ============================================
   Future<void> _loadProfile() async {
     try {
       final userId = supabase.auth.currentUser!.id;
@@ -35,7 +32,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .select('username, email')
           .eq('id', userId)
           .single();
-
       setState(() {
         _username = data['username'] ?? 'User';
         _email = data['email'] ?? '';
@@ -46,9 +42,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // ============================================
-  // تسجيل الخروج
-  // ============================================
   Future<void> _logout() async {
     await supabase.auth.signOut();
     if (mounted) {
@@ -77,7 +70,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Header — بيانات حقيقية من Supabase
                   Row(
                     children: [
                       const CircleAvatar(
@@ -120,10 +112,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) =>
-                              const EditProfileScreen(isManager: true),
+                          builder: (_) => EditProfileScreen(
+                            isManager: true,
+                            initialName: _username,
+                            initialEmail: _email,
+                            initialContact: '',
+                            initialCompany: '',
+                          ),
                         ),
-                      );
+                      ).then((_) => _loadProfile());
                     } else {
                       Navigator.push(
                         context,
@@ -166,7 +163,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         backgroundColor: const Color(0xFF1E161E),
                         padding: const EdgeInsets.all(15),
                       ),
-                      // ← تسجيل الخروج الحقيقي
                       onPressed: () => AccountActionsDialogs.showLogoutDialog(
                         context,
                         onConfirm: _logout,

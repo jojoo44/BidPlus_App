@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'qualified_contractors_screen.dart';
 import '../main.dart';
+import 'manager_proposal_details_screen.dart';
+import 'manager_proposal_details_screen.dart';
 
 class ProposalsListScreen extends StatefulWidget {
   final String? rfpId;
@@ -167,15 +169,29 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                         final date = p['submitDate'] ?? '—';
                         final desc = p['description'] ?? '';
 
-                        return _buildProposalCard(
-                          rank: '#${i + 1}',
-                          username: username,
-                          rfpTitle: rfpTitle,
-                          price: price?.toString() ?? '—',
-                          status: status,
-                          date: date,
-                          description: desc,
-                          cardColor: cardColor,
+                        return GestureDetector(
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ManagerProposalDetailsScreen(
+                                  proposal: p,
+                                  onStatusChanged: _loadProposals,
+                                ),
+                              ),
+                            );
+                            _loadProposals();
+                          },
+                          child: _buildProposalCard(
+                            rank: '#${i + 1}',
+                            username: username,
+                            rfpTitle: rfpTitle,
+                            price: price?.toString() ?? '—',
+                            status: status,
+                            date: date,
+                            description: desc,
+                            cardColor: cardColor,
+                          ),
                         );
                       },
                     ),

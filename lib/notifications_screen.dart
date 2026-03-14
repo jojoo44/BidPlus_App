@@ -1,7 +1,56 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../main.dart';
 
-class NotificationsScreen extends StatelessWidget {
+class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
+
+  @override
+  State<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends State<NotificationsScreen> {
+  List<Map<String, dynamic>> _notifications = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      final data = await supabase
+          .from('notifications')
+          .select()
+          .eq('userID', userId)
+          .order('timeStamp', ascending: false);
+
+      if (mounted) {
+        setState(() {
+          _notifications = List<Map<String, dynamic>>.from(data);
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  String _timeAgo(String? createdAt) {
+    if (createdAt == null) return '—';
+    final dt = DateTime.tryParse(createdAt);
+    if (dt == null) return '—';
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays == 1) return 'Yesterday';
+    return '${diff.inDays}d ago';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,29 +68,33 @@ class NotificationsScreen extends StatelessWidget {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        children: [
-          _buildNotificationCard(
-            "New Proposal Received",
-            "From: ABC Construction - Downtown Project",
-            "5m ago",
-            true,
-          ),
-          _buildNotificationCard(
-            "Contract Signed",
-            "The contract for 'Villa Renovation' is now active.",
-            "1h ago",
-            true,
-          ),
-          _buildNotificationCard(
-            "Negotiation Update",
-            "Contractor sent a new counter-offer.",
-            "Yesterday",
-            false,
-          ),
-        ],
-      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.blue))
+          : _notifications.isEmpty
+          ? const Center(
+              child: Text(
+                'No notifications yet',
+                style: TextStyle(color: Colors.grey),
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _loadNotifications,
+              color: Colors.blue,
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                itemCount: _notifications.length,
+                itemBuilder: (context, i) {
+                  final n = _notifications[i];
+                  final isUnread = n['readStatus'] == false;
+                  return _buildNotificationCard(
+                    n['type'] ?? '',
+                    n['message'] ?? '',
+                    _timeAgo(n['timeStamp']),
+                    isUnread,
+                  );
+                },
+              ),
+            ),
     );
   }
 
