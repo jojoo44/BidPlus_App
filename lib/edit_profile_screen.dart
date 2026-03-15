@@ -1,4 +1,6 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 
@@ -29,6 +31,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _companyController;
   bool _isSaving = false;
   bool _isLoading = true;
+  Uint8List? _imageBytes; // الصورة المختارة
+  String? _photoUrl; // رابط الصورة من Supabase
 
   @override
   void initState() {
@@ -46,18 +50,70 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (userId == null) return;
       final data = await supabase
           .from('User')
-          .select('phoneNumber, companyName')
+          .select('phoneNumber, companyName, photoUrl')
           .eq('id', userId)
           .single();
       if (mounted) {
         setState(() {
           _contactController.text = data['phoneNumber'] ?? '';
           _companyController.text = data['companyName'] ?? '';
+          _photoUrl = data['photoUrl'];
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // ====================================================
+  // اختيار صورة ورفعها على Supabase Storage
+  // ====================================================
+  Future<void> _pickAndUploadPhoto() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final bytes = result.files.first.bytes;
+      if (bytes == null) return;
+      setState(() => _imageBytes = bytes);
+
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+      final filePath = 'avatars/$userId.jpg';
+
+      await supabase.storage
+          .from('profiles')
+          .uploadBinary(
+            filePath,
+            bytes,
+            fileOptions: const FileOptions(
+              upsert: true,
+              contentType: 'image/jpeg',
+            ),
+          );
+
+      final url = supabase.storage.from('profiles').getPublicUrl(filePath);
+      await supabase.from('User').update({'photoUrl': url}).eq('id', userId);
+
+      if (mounted) {
+        setState(() => _photoUrl = url);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photo updated!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error uploading photo: $e')));
+      }
     }
   }
 
@@ -75,7 +131,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       final userId = supabase.auth.currentUser?.id;
       if (userId == null) return;
-
       await supabase
           .from('User')
           .update({
@@ -84,7 +139,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             'companyName': _companyController.text.trim(),
           })
           .eq('id', userId);
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -95,11 +149,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -117,97 +170,116 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         elevation: 0,
         foregroundColor: Colors.white,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Center(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.blue))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  CircleAvatar(
-                    radius: 45,
-                    backgroundColor: Colors.deepPurple,
-                    child: Text(
-                      widget.initialName.isNotEmpty
-                          ? widget.initialName[0].toUpperCase()
-                          : '?',
-                      style: const TextStyle(color: Colors.white, fontSize: 32),
+                  Center(
+                    child: Column(
+                      children: [
+                        GestureDetector(
+                          onTap: _pickAndUploadPhoto,
+                          child: CircleAvatar(
+                            radius: 45,
+                            backgroundColor: Colors.deepPurple,
+                            backgroundImage: _imageBytes != null
+                                ? MemoryImage(_imageBytes!)
+                                : (_photoUrl != null
+                                      ? NetworkImage(_photoUrl!)
+                                            as ImageProvider
+                                      : null),
+                            child: _imageBytes == null && _photoUrl == null
+                                ? Text(
+                                    widget.initialName.isNotEmpty
+                                        ? widget.initialName[0].toUpperCase()
+                                        : '?',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 32,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        ElevatedButton(
+                          onPressed: _pickAndUploadPhoto,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF252B3D),
+                          ),
+                          child: const Text(
+                            "Change Photo",
+                            style: TextStyle(color: Colors.blue),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF252B3D),
+                  const SizedBox(height: 30),
+
+                  _buildTextField(
+                    "Full Name",
+                    "Jane Doe",
+                    controller: _nameController,
+                  ),
+                  _buildTextField(
+                    "Email Address",
+                    "jane.doe@example.com",
+                    controller: _emailController,
+                    readOnly: true,
+                  ),
+                  _buildTextField(
+                    "Phone Number",
+                    "Enter your phone number",
+                    controller: _contactController,
+                  ),
+
+                  if (widget.isManager)
+                    _buildTextField(
+                      "Company Name",
+                      "Creative Solutions Inc.",
+                      controller: _companyController,
                     ),
-                    child: const Text(
-                      "Change Photo",
-                      style: TextStyle(color: Colors.blue),
+
+                  if (!widget.isManager) ...[
+                    _buildDropdownField(
+                      "Professional Specialization",
+                      "Plumbing",
+                    ),
+                    const SizedBox(height: 20),
+                    _buildSectionLabel("Update Documents"),
+                    _buildFileTile("BusinessLicense.pdf"),
+                    _buildFileTile("LiabilityInsurance.pdf"),
+                  ],
+
+                  const SizedBox(height: 40),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 55,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: _isSaving ? null : _saveChanges,
+                      child: _isSaving
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              "Save Changes",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 30),
-
-            _buildTextField(
-              "Full Name",
-              "Jane Doe",
-              controller: _nameController,
-            ),
-            _buildTextField(
-              "Email Address",
-              "jane.doe@example.com",
-              controller: _emailController,
-              readOnly: true,
-            ),
-            _buildTextField(
-              "Phone Number",
-              "Enter your phone number",
-              controller: _contactController,
-            ),
-
-            if (widget.isManager)
-              _buildTextField(
-                "Company Name",
-                "Creative Solutions Inc.",
-                controller: _companyController,
-              ),
-
-            if (!widget.isManager) ...[
-              _buildDropdownField("Professional Specialization", "Plumbing"),
-              const SizedBox(height: 20),
-              _buildSectionLabel("Update Documents"),
-              _buildFileTile("BusinessLicense.pdf"),
-              _buildFileTile("LiabilityInsurance.pdf"),
-            ],
-
-            const SizedBox(height: 40),
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: _isSaving ? null : _saveChanges,
-                child: _isSaving
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        "Save Changes",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -264,64 +336,52 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  Widget _buildDropdownField(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildDropdownField(String label, String value) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: const TextStyle(color: Colors.white)),
+      const SizedBox(height: 8),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 15),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E212A),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: ListTile(
+          title: Text(value, style: const TextStyle(color: Colors.white)),
+          trailing: const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
+        ),
+      ),
+    ],
+  );
+
+  Widget _buildFileTile(String fileName) => Container(
+    margin: const EdgeInsets.only(top: 10),
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: const Color(0xFF1E212A),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
       children: [
-        Text(label, style: const TextStyle(color: Colors.white)),
-        const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 15),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E212A),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: ListTile(
-            title: Text(value, style: const TextStyle(color: Colors.white)),
-            trailing: const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
-          ),
+        const Icon(Icons.description, color: Colors.blue),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(fileName, style: const TextStyle(color: Colors.white)),
+        ),
+        TextButton(
+          onPressed: () {},
+          child: const Text("Re-upload", style: TextStyle(color: Colors.grey)),
         ),
       ],
-    );
-  }
+    ),
+  );
 
-  Widget _buildFileTile(String fileName) {
-    return Container(
-      margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E212A),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.description, color: Colors.blue),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(fileName, style: const TextStyle(color: Colors.white)),
-          ),
-          TextButton(
-            onPressed: () {},
-            child: const Text(
-              "Re-upload",
-              style: TextStyle(color: Colors.grey),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionLabel(String label) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
+  Widget _buildSectionLabel(String label) => Align(
+    alignment: Alignment.centerLeft,
+    child: Text(
+      label,
+      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+    ),
+  );
 }

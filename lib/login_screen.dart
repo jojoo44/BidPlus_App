@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'role_selection_screen.dart';
 import 'dashboard.dart';
 import 'contractor_dashboard_screen.dart';
-import '../main.dart'; // عشان نوصل لـ supabase helper
+import '../main.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -24,9 +24,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // ============================================
-  // دالة تسجيل الدخول
-  // ============================================
   Future<void> _signIn() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -34,45 +31,35 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       return;
     }
-
     setState(() => _isLoading = true);
-
     try {
-      // 1. تسجيل الدخول عبر Supabase Auth
       await supabase.auth.signInWithPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-
-      // 2. جيب الـ role من جدول User
       final userId = supabase.auth.currentUser!.id;
       final data = await supabase
           .from('User')
           .select('role')
           .eq('id', userId)
           .single();
-
       final role = data['role'];
-
-      // 3. وجّه حسب الـ role
       if (mounted) {
         if (role == 'manager') {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const BidPlus()),
+            MaterialPageRoute(builder: (_) => const BidPlus()),
           );
         } else if (role == 'contractor') {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
-              builder: (context) => const ContractorDashboardScreen(),
+              builder: (_) => const ContractorDashboardScreen(),
             ),
-            // غيري BidPlus لصفحة الـ Contractor Dashboard لما تكون جاهزة
           );
         }
       }
     } on AuthException catch (e) {
-      // خطأ من Supabase: إيميل غلط، باسورد غلط، إلخ
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(e.message)));
@@ -85,9 +72,32 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  // ============================================
-  // الـ UI — نفس تصميمك الأصلي
-  // ============================================
+  Future<void> _forgotPassword() async {
+    if (_emailController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your email first')),
+      );
+      return;
+    }
+    try {
+      await supabase.auth.resetPasswordForEmail(_emailController.text.trim());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Password reset email sent! Check your inbox.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -122,7 +132,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: _forgotPassword,
                   child: const Text(
                     "Forgot Password?",
                     style: TextStyle(color: Colors.blue),
@@ -160,14 +170,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(color: Colors.grey),
                   ),
                   TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const RoleSelectionScreen(),
-                        ),
-                      );
-                    },
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const RoleSelectionScreen(),
+                      ),
+                    ),
                     child: const Text("Sign Up"),
                   ),
                 ],

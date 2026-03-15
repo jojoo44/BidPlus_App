@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'edit_profile_screen.dart';
 import 'contractor_edit_account_screen.dart';
 import 'account_actions_dialogs.dart';
+import 'change_password_screen.dart';
 import 'login_screen.dart';
 import '../main.dart';
 
@@ -16,6 +17,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   String _username = '';
   String _email = '';
+  String? _photoUrl;
   bool _isLoading = true;
 
   @override
@@ -29,12 +31,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final userId = supabase.auth.currentUser!.id;
       final data = await supabase
           .from('User')
-          .select('username, email')
+          .select('username, email, photoUrl')
           .eq('id', userId)
           .single();
       setState(() {
         _username = data['username'] ?? 'User';
         _email = data['email'] ?? '';
+        _photoUrl = data['photoUrl'];
         _isLoading = false;
       });
     } catch (e) {
@@ -72,14 +75,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   Row(
                     children: [
-                      const CircleAvatar(
+                      CircleAvatar(
                         radius: 35,
-                        backgroundColor: Color(0xFF3395FF),
-                        child: Icon(
-                          Icons.person,
-                          color: Colors.white,
-                          size: 35,
-                        ),
+                        backgroundColor: const Color(0xFF3395FF),
+                        backgroundImage: _photoUrl != null
+                            ? NetworkImage(_photoUrl!) as ImageProvider
+                            : null,
+                        child: _photoUrl == null
+                            ? const Icon(
+                                Icons.person,
+                                color: Colors.white,
+                                size: 35,
+                              )
+                            : null,
                       ),
                       const SizedBox(width: 15),
                       Column(
@@ -130,10 +138,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       );
                     }
                   }),
+
                   _buildProfileItem(
                     Icons.lock_outline,
                     "Change Password",
-                    () {},
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ChangePasswordScreen(),
+                      ),
+                    ),
                   ),
 
                   const SizedBox(height: 20),
@@ -207,16 +221,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
       color: const Color(0xFF1E212A),
       borderRadius: BorderRadius.circular(12),
     ),
-    child: ListTile(
-      leading: Icon(
-        icon,
-        color: textColor == Colors.red ? Colors.red : Colors.grey,
+    child: Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                color: textColor == Colors.red ? Colors.red : Colors.grey,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(color: textColor, fontSize: 15),
+                ),
+              ),
+              trailing ??
+                  const Icon(
+                    Icons.arrow_forward_ios,
+                    size: 14,
+                    color: Colors.grey,
+                  ),
+            ],
+          ),
+        ),
       ),
-      title: Text(title, style: TextStyle(color: textColor, fontSize: 15)),
-      trailing:
-          trailing ??
-          const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-      onTap: onTap,
     ),
   );
 }
