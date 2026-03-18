@@ -58,6 +58,31 @@ class _ContractorRFPDetailsScreenState
     } catch (_) {}
   }
 
+  // إرسال إشعار للمنجر — مع التحقق من notificationsEnabled
+  Future<void> _notifyManager(String contractorName) async {
+    try {
+      final managerId = _rfp?['creatorUser'];
+      if (managerId == null) return;
+
+      // تحقق إن المنجر مفعّل الإشعارات
+      final managerData = await supabase
+          .from('User')
+          .select('notificationsEnabled')
+          .eq('id', managerId)
+          .single();
+      if (managerData['notificationsEnabled'] == false) return;
+
+      final rfpTitle = _rfp?['title'] ?? 'an RFP';
+      await supabase.from('Notification').insert({
+        'userID': managerId,
+        'type': 'New Proposal Received',
+        'message': '$contractorName submitted a proposal for "$rfpTitle"',
+        'readStatus': false,
+        'timeStamp': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {}
+  }
+
   void _showSubmitProposalSheet() {
     final priceController = TextEditingController();
     final descController = TextEditingController();
@@ -185,6 +210,17 @@ class _ContractorRFPDetailsScreenState
                                   .toIso8601String()
                                   .split('T')[0],
                             });
+
+                            // جيب اسم الكونتراكتور وأرسل إشعار للمنجر
+                            final userData = await supabase
+                                .from('User')
+                                .select('username')
+                                .eq('id', userId)
+                                .single();
+                            await _notifyManager(
+                              userData['username'] ?? 'A contractor',
+                            );
+
                             if (mounted) {
                               Navigator.pop(ctx);
                               setState(() => _hasSubmitted = true);
@@ -294,7 +330,6 @@ class _ContractorRFPDetailsScreenState
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 20),
                   _buildSectionTitle('Key Information'),
                   _buildInfoCard([
@@ -314,7 +349,6 @@ class _ContractorRFPDetailsScreenState
                       _rfp!['creationDate'] ?? '—',
                     ),
                   ]),
-
                   const SizedBox(height: 20),
                   _buildSectionTitle('Description'),
                   Container(
@@ -333,7 +367,6 @@ class _ContractorRFPDetailsScreenState
                       ),
                     ),
                   ),
-
                   if (_rfp!['evaluationCriteria'] != null) ...[
                     const SizedBox(height: 20),
                     _buildSectionTitle('Evaluation Criteria'),
@@ -353,9 +386,7 @@ class _ContractorRFPDetailsScreenState
                       ),
                     ),
                   ],
-
                   const SizedBox(height: 40),
-
                   _hasSubmitted
                       ? Container(
                           width: double.infinity,

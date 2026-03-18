@@ -1,4 +1,6 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 
@@ -20,6 +22,8 @@ class _ContractorEditAccountScreenState
   bool _isLoading = true;
   bool _isSaving = false;
   String? _email;
+  Uint8List? _imageBytes;
+  String? _photoUrl;
 
   final List<Map<String, String>> _tags = [
     {'label': 'Construction', 'value': 'construction'},
@@ -50,23 +54,69 @@ class _ContractorEditAccountScreenState
     try {
       final user = supabase.auth.currentUser;
       if (user == null) return;
-
       final data = await supabase
           .from('User')
-          .select('username, contactInfo, specialization, specializationTag')
+          .select(
+            'username, contactInfo, specialization, specializationTag, photoUrl',
+          )
           .eq('id', user.id)
           .single();
-
       setState(() {
         _email = user.email ?? '';
         _nameController.text = data['username'] ?? '';
         _phoneController.text = data['contactInfo'] ?? '';
         _specController.text = data['specialization'] ?? '';
         _selectedTag = data['specializationTag'];
+        _photoUrl = data['photoUrl'];
         _isLoading = false;
       });
     } catch (e) {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _pickAndUploadPhoto() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        withData: true,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final bytes = result.files.first.bytes;
+      if (bytes == null) return;
+      setState(() => _imageBytes = bytes);
+
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+      final filePath = 'avatars/$userId.jpg';
+
+      await supabase.storage
+          .from('profiles')
+          .uploadBinary(
+            filePath,
+            bytes,
+            fileOptions: const FileOptions(
+              upsert: true,
+              contentType: 'image/jpeg',
+            ),
+          );
+      final url = supabase.storage.from('profiles').getPublicUrl(filePath);
+      await supabase.from('User').update({'photoUrl': url}).eq('id', userId);
+
+      if (mounted) {
+        setState(() => _photoUrl = url);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photo updated!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error uploading photo: $e')));
     }
   }
 
@@ -83,7 +133,6 @@ class _ContractorEditAccountScreenState
             'specializationTag': _selectedTag,
           })
           .eq('id', userId);
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -127,21 +176,29 @@ class _ContractorEditAccountScreenState
                   Center(
                     child: Column(
                       children: [
-                        const CircleAvatar(
-                          radius: 45,
-                          backgroundColor: Color(0xFF5D78FF),
-                          child: Icon(
-                            Icons.person,
-                            color: Colors.white,
-                            size: 45,
+                        GestureDetector(
+                          onTap: _pickAndUploadPhoto,
+                          child: CircleAvatar(
+                            radius: 45,
+                            backgroundColor: const Color(0xFF5D78FF),
+                            backgroundImage: _imageBytes != null
+                                ? MemoryImage(_imageBytes!)
+                                : (_photoUrl != null
+                                      ? NetworkImage(_photoUrl!)
+                                            as ImageProvider
+                                      : null),
+                            child: _imageBytes == null && _photoUrl == null
+                                ? const Icon(
+                                    Icons.person,
+                                    color: Colors.white,
+                                    size: 45,
+                                  )
+                                : null,
                           ),
                         ),
                         const SizedBox(height: 10),
                         ElevatedButton(
-                          onPressed: () =>
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Coming soon')),
-                              ),
+                          onPressed: _pickAndUploadPhoto,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF252B3D),
                           ),
@@ -156,7 +213,6 @@ class _ContractorEditAccountScreenState
 
                   const SizedBox(height: 30),
 
-                  // الحقول
                   _buildTextField(
                     'Full Name',
                     _nameController,
@@ -168,8 +224,6 @@ class _ContractorEditAccountScreenState
                     _phoneController,
                     '05xxxxxxxx',
                   ),
-
-                  const SizedBox(height: 8),
                   _buildTextField(
                     'Your Specialization',
                     _specController,

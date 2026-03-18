@@ -21,11 +21,10 @@ class ContractorDashboardScreen extends StatefulWidget {
 class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
   int _selectedIndex = 0;
   String _username = 'Contractor';
-  String? _userTag; // تاق الكونتراكتور
-
+  String? _userTag;
   List<Map<String, dynamic>> _publishedRFPs = [];
   bool _isLoadingRFPs = true;
-
+  int _unreadCount = 0;
   RealtimeChannel? _realtimeChannel;
 
   @override
@@ -41,7 +40,6 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
     super.dispose();
   }
 
-  // جيب بيانات المستخدم + تاقه ثم حمّل الـ RFPs
   Future<void> _checkAuth() async {
     final user = supabase.auth.currentUser;
     if (user == null) {
@@ -52,13 +50,11 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
         );
       return;
     }
-
     final data = await supabase
         .from('User')
         .select('role, username, specializationTag')
         .eq('id', user.id)
         .single();
-
     if (data['role'] != 'contractor' && mounted) {
       Navigator.pushReplacement(
         context,
@@ -66,37 +62,43 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
       );
       return;
     }
-
     if (mounted) {
       setState(() {
         _username = data['username'] ?? 'Contractor';
         _userTag = data['specializationTag'];
       });
-      _loadPublishedRFPs(); // حمّل بعد ما نعرف التاق
+      _loadPublishedRFPs();
+      _loadUnreadCount();
     }
   }
 
-  // جيب الـ RFPs حسب التاق
   Future<void> _loadPublishedRFPs() async {
     try {
       dynamic query = supabase.from('RFP').select().eq('status', 'Published');
-
-      // لو عنده تاق — فلتر، لو ما عنده — عرض الكل
-      if (_userTag != null && _userTag!.isNotEmpty) {
+      if (_userTag != null && _userTag!.isNotEmpty)
         query = query.or('requiredTag.eq.$_userTag,requiredTag.is.null');
-      }
-
       final data = await query.order('creationDate', ascending: false);
-
-      if (mounted) {
+      if (mounted)
         setState(() {
           _publishedRFPs = List<Map<String, dynamic>>.from(data);
           _isLoadingRFPs = false;
         });
-      }
     } catch (e) {
       if (mounted) setState(() => _isLoadingRFPs = false);
     }
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+      final data = await supabase
+          .from('Notification')
+          .select('notificationID')
+          .eq('userID', userId)
+          .eq('readStatus', false);
+      if (mounted) setState(() => _unreadCount = (data as List).length);
+    } catch (_) {}
   }
 
   void _subscribeRealtime() {
@@ -159,7 +161,6 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -174,7 +175,6 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
                         color: Colors.white,
                       ),
                     ),
-                    // عرض التاق الحالي
                     if (_userTag != null)
                       Container(
                         margin: const EdgeInsets.only(top: 4),
@@ -198,17 +198,45 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
                 ),
                 Row(
                   children: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.notifications_outlined,
-                        color: Colors.white70,
-                      ),
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ContractorNotificationsScreen(),
+                    Stack(
+                      children: [
+                        IconButton(
+                          icon: const Icon(
+                            Icons.notifications_outlined,
+                            color: Colors.white70,
+                          ),
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const ContractorNotificationsScreen(),
+                              ),
+                            );
+                            _loadUnreadCount();
+                          },
                         ),
-                      ),
+                        if (_unreadCount > 0)
+                          Positioned(
+                            right: 6,
+                            top: 6,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                '$_unreadCount',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     IconButton(
                       icon: const Icon(
@@ -223,7 +251,6 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
                                 const ProfileScreen(isManager: false),
                           ),
                         );
-                        // أعد تحميل التاق والبيانات بعد الرجوع
                         _checkAuth();
                       },
                     ),
@@ -263,8 +290,6 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
             ),
 
             const SizedBox(height: 30),
-
-            // New Bids
             Row(
               children: [
                 const Text(
@@ -294,7 +319,6 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
               ],
             ),
 
-            // تلميح للفلترة
             if (_userTag != null)
               Padding(
                 padding: const EdgeInsets.only(top: 6, bottom: 4),
@@ -305,7 +329,6 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
               ),
 
             const SizedBox(height: 15),
-
             _isLoadingRFPs
                 ? const Center(
                     child: Padding(
@@ -396,15 +419,11 @@ class _ContractorDashboardScreenState extends State<ContractorDashboardScreen> {
   }
 }
 
-// ============================================
-// Widgets المساعدة
-// ============================================
 class _QuickActionCard extends StatelessWidget {
   final String label;
   final IconData icon;
   final Color iconColor;
   final VoidCallback onTap;
-
   const _QuickActionCard({
     required this.label,
     required this.icon,
@@ -445,7 +464,6 @@ class _ProjectCard extends StatelessWidget {
   final String title;
   final double progress;
   final String progressText;
-
   const _ProjectCard({
     required this.title,
     required this.progress,
@@ -500,7 +518,6 @@ class _BidRow extends StatelessWidget {
   final dynamic budget;
   final String? tag;
   final VoidCallback onTap;
-
   const _BidRow({
     required this.rfpId,
     required this.title,

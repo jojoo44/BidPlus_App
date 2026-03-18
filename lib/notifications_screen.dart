@@ -25,7 +25,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       if (userId == null) return;
 
       final data = await supabase
-          .from('notifications')
+          .from('Notification')
           .select()
           .eq('userID', userId)
           .order('timeStamp', ascending: false);
@@ -41,6 +41,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
+  Future<void> _markAsRead(dynamic notificationId) async {
+    try {
+      await supabase
+          .from('Notification')
+          .update({'readStatus': true})
+          .eq('notificationID', notificationId);
+      _loadNotifications();
+    } catch (_) {}
+  }
+
+  Future<void> _markAllAsRead() async {
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+      await supabase
+          .from('Notification')
+          .update({'readStatus': true})
+          .eq('userID', userId);
+      _loadNotifications();
+    } catch (_) {}
+  }
+
   String _timeAgo(String? createdAt) {
     if (createdAt == null) return '—';
     final dt = DateTime.tryParse(createdAt);
@@ -54,27 +76,73 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final unreadCount = _notifications
+        .where((n) => n['readStatus'] == false)
+        .length;
+
     return Scaffold(
       backgroundColor: const Color(0xFF12141D),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text(
-          "Notifications",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        title: Row(
+          children: [
+            const Text(
+              "Notifications",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (unreadCount > 0) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '$unreadCount',
+                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                ),
+              ),
+            ],
+          ],
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          if (unreadCount > 0)
+            TextButton(
+              onPressed: _markAllAsRead,
+              child: const Text(
+                'Mark all read',
+                style: TextStyle(color: Colors.blue, fontSize: 12),
+              ),
+            ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.blue))
           : _notifications.isEmpty
           ? const Center(
-              child: Text(
-                'No notifications yet',
-                style: TextStyle(color: Colors.grey),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.notifications_off_outlined,
+                    color: Colors.grey,
+                    size: 48,
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    'No notifications yet',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
               ),
             )
           : RefreshIndicator(
@@ -86,11 +154,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 itemBuilder: (context, i) {
                   final n = _notifications[i];
                   final isUnread = n['readStatus'] == false;
-                  return _buildNotificationCard(
-                    n['type'] ?? '',
-                    n['message'] ?? '',
-                    _timeAgo(n['timeStamp']),
-                    isUnread,
+                  return GestureDetector(
+                    onTap: () {
+                      if (isUnread) _markAsRead(n['notificationID']);
+                    },
+                    child: _buildNotificationCard(
+                      n['type'] ?? '',
+                      n['message'] ?? '',
+                      _timeAgo(n['timeStamp']),
+                      isUnread,
+                    ),
                   );
                 },
               ),
@@ -151,7 +224,25 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               ],
             ),
           ),
-          Text(time, style: const TextStyle(color: Colors.grey, fontSize: 10)),
+          Column(
+            children: [
+              Text(
+                time,
+                style: const TextStyle(color: Colors.grey, fontSize: 10),
+              ),
+              if (isUnread) ...[
+                const SizedBox(height: 6),
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Colors.blue,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
+            ],
+          ),
         ],
       ),
     );

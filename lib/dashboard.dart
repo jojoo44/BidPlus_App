@@ -19,19 +19,14 @@ class BidPlus extends StatefulWidget {
 
 class _BidPlusState extends State<BidPlus> {
   String selectedFilter = "All";
-
-  // ============================================
-  // بيانات حقيقية من Supabase
-  // ============================================
   List<Map<String, dynamic>> _rfps = [];
   bool _isLoading = true;
   String _username = '';
   int _activeCount = 0;
   int _pendingCount = 0;
   int _draftCount = 0;
-
-  // Realtime channel
   RealtimeChannel? _realtimeChannel;
+  int _unreadCount = 0;
 
   @override
   void initState() {
@@ -39,6 +34,7 @@ class _BidPlusState extends State<BidPlus> {
     _checkAuth();
     _loadData();
     _subscribeRealtime();
+    _loadUnreadCount();
   }
 
   @override
@@ -47,27 +43,21 @@ class _BidPlusState extends State<BidPlus> {
     super.dispose();
   }
 
-  // ============================================
-  // التحقق من الصلاحية
-  // ============================================
   Future<void> _checkAuth() async {
     final user = supabase.auth.currentUser;
     if (user == null) {
-      if (mounted) {
+      if (mounted)
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const LoginScreen()),
         );
-      }
       return;
     }
-
     final data = await supabase
         .from('User')
         .select('role, username')
         .eq('id', user.id)
         .single();
-
     if (data['role'] != 'manager' && mounted) {
       Navigator.pushReplacement(
         context,
@@ -78,22 +68,16 @@ class _BidPlusState extends State<BidPlus> {
     if (mounted) setState(() => _username = data['username'] ?? 'Manager');
   }
 
-  // ============================================
-  // جيب البيانات من Supabase
-  // ============================================
   Future<void> _loadData() async {
     try {
       final userId = supabase.auth.currentUser?.id;
       if (userId == null) return;
-
       final data = await supabase
           .from('RFP')
           .select()
           .eq('creatorUser', userId)
           .order('creationDate', ascending: false);
-
       final rfps = List<Map<String, dynamic>>.from(data);
-
       if (mounted) {
         setState(() {
           _rfps = rfps;
@@ -108,24 +92,31 @@ class _BidPlusState extends State<BidPlus> {
     }
   }
 
-  // ============================================
-  // Realtime — يتحدث فوراً عند أي تغيير في RFP
-  // ============================================
   void _subscribeRealtime() {
     _realtimeChannel = supabase
         .channel('rfp_realtime')
         .onPostgresChanges(
-          event: PostgresChangeEvent.all, // INSERT + UPDATE + DELETE
+          event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'RFP',
-          callback: (payload) => _loadData(), // أعد التحميل تلقائياً
+          callback: (payload) => _loadData(),
         )
         .subscribe();
   }
 
-  // ============================================
-  // فلترة الـ RFPs
-  // ============================================
+  Future<void> _loadUnreadCount() async {
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+      final data = await supabase
+          .from('Notification')
+          .select('notificationID')
+          .eq('userID', userId)
+          .eq('readStatus', false);
+      if (mounted) setState(() => _unreadCount = (data as List).length);
+    } catch (_) {}
+  }
+
   List<Map<String, dynamic>> get filteredRFPs {
     if (selectedFilter == "All") return _rfps;
     final map = {
@@ -171,9 +162,6 @@ class _BidPlusState extends State<BidPlus> {
     }
   }
 
-  // ============================================
-  // UI
-  // ============================================
   @override
   Widget build(BuildContext context) {
     const bgColor = Color(0xFF0D1219);
@@ -188,7 +176,7 @@ class _BidPlusState extends State<BidPlus> {
         actions: [_buildNotificationIcon(context), _buildProfileIcon(context)],
       ),
       body: RefreshIndicator(
-        onRefresh: _loadData, // سحب لأسفل يحدّث
+        onRefresh: _loadData,
         color: primaryBlue,
         backgroundColor: cardColor,
         child: SingleChildScrollView(
@@ -197,7 +185,6 @@ class _BidPlusState extends State<BidPlus> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Welcome
               Text(
                 _username.isEmpty ? 'Dashboard' : 'Welcome, $_username 👋',
                 style: const TextStyle(
@@ -207,8 +194,6 @@ class _BidPlusState extends State<BidPlus> {
                 ),
               ),
               const SizedBox(height: 25),
-
-              // Buttons
               _buildActionButton(
                 context,
                 "Create New RFP",
@@ -219,7 +204,7 @@ class _BidPlusState extends State<BidPlus> {
                     context,
                     MaterialPageRoute(builder: (_) => const CreateRFPScreen()),
                   );
-                  _loadData(); // حدّث بعد الرجوع
+                  _loadData();
                 },
               ),
               const SizedBox(height: 12),
@@ -236,10 +221,7 @@ class _BidPlusState extends State<BidPlus> {
                 ),
                 isOutlined: true,
               ),
-
               const SizedBox(height: 30),
-
-              // Stats — أرقام حقيقية
               Row(
                 children: [
                   _buildStatCard(
@@ -272,7 +254,6 @@ class _BidPlusState extends State<BidPlus> {
                 isFullWidth: true,
                 onTap: () => setState(() => selectedFilter = "Drafts"),
               ),
-
               const SizedBox(height: 30),
               Row(
                 children: [
@@ -303,10 +284,7 @@ class _BidPlusState extends State<BidPlus> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 40),
-
-              // Recent RFPs header
               Row(
                 children: [
                   const Text(
@@ -318,7 +296,6 @@ class _BidPlusState extends State<BidPlus> {
                     ),
                   ),
                   const Spacer(),
-                  // مؤشر Realtime
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 8,
@@ -349,8 +326,6 @@ class _BidPlusState extends State<BidPlus> {
                 ],
               ),
               const SizedBox(height: 15),
-
-              // Filters
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
@@ -364,8 +339,6 @@ class _BidPlusState extends State<BidPlus> {
                 ),
               ),
               const SizedBox(height: 20),
-
-              // List
               _isLoading
                   ? const Center(
                       child: Padding(
@@ -395,7 +368,7 @@ class _BidPlusState extends State<BidPlus> {
                                   ),
                                 ),
                               );
-                              _loadData(); // حدّث الداشبورد بعد الرجوع
+                              _loadData();
                             },
                             child: _buildRecentRFPCard(
                               cardColor,
@@ -418,9 +391,6 @@ class _BidPlusState extends State<BidPlus> {
     );
   }
 
-  // ============================================
-  // Empty State
-  // ============================================
   Widget _buildEmptyState() => Container(
     width: double.infinity,
     padding: const EdgeInsets.all(40),
@@ -471,9 +441,6 @@ class _BidPlusState extends State<BidPlus> {
     ),
   );
 
-  // ============================================
-  // Widgets المساعدة
-  // ============================================
   Widget _buildQuickAction(
     BuildContext context,
     String label,
@@ -657,19 +624,46 @@ class _BidPlusState extends State<BidPlus> {
     ),
   );
 
-  Widget _buildNotificationIcon(BuildContext context) => IconButton(
-    icon: const Icon(Icons.notifications, color: Colors.white),
-    onPressed: () => Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-    ),
+  Widget _buildNotificationIcon(BuildContext context) => Stack(
+    children: [
+      IconButton(
+        icon: const Icon(Icons.notifications, color: Colors.white),
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+          );
+          _loadUnreadCount();
+        },
+      ),
+      if (_unreadCount > 0)
+        Positioned(
+          right: 6,
+          top: 6,
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: const BoxDecoration(
+              color: Colors.red,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '$_unreadCount',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+    ],
   );
 
   Widget _buildProfileIcon(BuildContext context) => IconButton(
     icon: const Icon(Icons.account_circle_outlined, color: Colors.white),
     onPressed: () => Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const ProfileScreen(isManager: true)),
+      MaterialPageRoute(builder: (_) => ProfileScreen(isManager: true)),
     ),
   );
 }

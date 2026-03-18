@@ -19,6 +19,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _email = '';
   String? _photoUrl;
   bool _isLoading = true;
+  bool _notificationsEnabled = true;
 
   @override
   void initState() {
@@ -31,13 +32,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final userId = supabase.auth.currentUser!.id;
       final data = await supabase
           .from('User')
-          .select('username, email, photoUrl')
+          .select('username, email, photoUrl, notificationsEnabled')
           .eq('id', userId)
           .single();
       setState(() {
         _username = data['username'] ?? 'User';
         _email = data['email'] ?? '';
         _photoUrl = data['photoUrl'];
+        _notificationsEnabled = data['notificationsEnabled'] ?? true;
         _isLoading = false;
       });
     } catch (e) {
@@ -157,9 +159,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     "Notifications",
                     () {},
                     trailing: Switch(
-                      value: true,
-                      onChanged: (v) {},
+                      value: _notificationsEnabled,
                       activeThumbColor: Colors.blue,
+                      onChanged: (v) async {
+                        setState(() => _notificationsEnabled = v);
+                        final userId = supabase.auth.currentUser?.id;
+                        if (userId != null) {
+                          await supabase
+                              .from('User')
+                              .update({'notificationsEnabled': v})
+                              .eq('id', userId);
+                        }
+                      },
                     ),
                   ),
 

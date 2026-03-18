@@ -36,27 +36,35 @@ class _ManagerProposalDetailsScreenState
     setState(() => _isLoading = true);
     try {
       final proposalId = widget.proposal['ProposalID'];
-      print('Updating ProposalID: $proposalId to $newStatus');
       await supabase
           .from('proposals')
           .update({'status': newStatus})
           .eq('ProposalID', proposalId);
 
-      // أرسل إشعار للكونتراكتور
+      // تحقق إن الكونتراكتور مفعّل الإشعارات ثم أرسل
       final contractorId = widget.proposal['submitterUserId'];
       if (contractorId != null) {
-        final rfpTitle = widget.proposal['RFP']?['title'] ?? 'a project';
-        await supabase.from('Notification').insert({
-          'userID': contractorId,
-          'type': newStatus,
-          'message': newStatus == 'Accepted'
-              ? 'Your proposal for "$rfpTitle" has been accepted!'
-              : newStatus == 'Rejected'
-              ? 'Your proposal for "$rfpTitle" was not selected this time.'
-              : 'Your proposal for "$rfpTitle" is now under review.',
-          'readStatus': false,
-          'timeStamp': DateTime.now().toIso8601String(),
-        });
+        final contractorData = await supabase
+            .from('User')
+            .select('notificationsEnabled')
+            .eq('id', contractorId)
+            .maybeSingle();
+
+        if (contractorData != null &&
+            contractorData['notificationsEnabled'] != false) {
+          final rfpTitle = widget.proposal['RFP']?['title'] ?? 'a project';
+          await supabase.from('Notification').insert({
+            'userID': contractorId,
+            'type': newStatus,
+            'message': newStatus == 'Accepted'
+                ? 'Your proposal for "$rfpTitle" has been accepted!'
+                : newStatus == 'Rejected'
+                ? 'Your proposal for "$rfpTitle" was not selected this time.'
+                : 'Your proposal for "$rfpTitle" is now under review.',
+            'readStatus': false,
+            'timeStamp': DateTime.now().toIso8601String(),
+          });
+        }
       }
 
       setState(() => _status = newStatus);
@@ -73,11 +81,10 @@ class _ManagerProposalDetailsScreenState
         );
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -121,7 +128,7 @@ class _ManagerProposalDetailsScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // حالة العرض
+            // Status
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -149,8 +156,6 @@ class _ManagerProposalDetailsScreenState
             ),
 
             const SizedBox(height: 20),
-
-            // Contractor Info
             _sectionTitle('Contractor Info'),
             _infoCard([
               _row(Icons.person, 'Name', name),
@@ -159,8 +164,6 @@ class _ManagerProposalDetailsScreenState
             ]),
 
             const SizedBox(height: 16),
-
-            // معلومات الـ RFP
             _sectionTitle('Project Info'),
             _infoCard([
               _row(Icons.title, 'Project', rfp['title'] ?? '—'),
@@ -173,8 +176,6 @@ class _ManagerProposalDetailsScreenState
             ]),
 
             const SizedBox(height: 16),
-
-            // الوصف
             if (desc.isNotEmpty) ...[
               _sectionTitle('Cover Letter'),
               Container(
@@ -183,7 +184,7 @@ class _ManagerProposalDetailsScreenState
                 decoration: BoxDecoration(
                   color: card,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: const Color(0xFF22314A)),
+                  border: Border.all(color: stroke),
                 ),
                 child: Text(
                   desc,
@@ -198,7 +199,6 @@ class _ManagerProposalDetailsScreenState
 
             const SizedBox(height: 32),
 
-            // أزرار الAccept والReject
             if (_status.toLowerCase() != 'accepted' &&
                 _status.toLowerCase() != 'rejected') ...[
               Row(
@@ -253,7 +253,6 @@ class _ManagerProposalDetailsScreenState
                 ],
               ),
               const SizedBox(height: 12),
-              // زر Under Review
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -276,7 +275,6 @@ class _ManagerProposalDetailsScreenState
                 ),
               ),
             ] else ...[
-              // لو تم الAccept أو الReject — زر تغيير الحالة
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
