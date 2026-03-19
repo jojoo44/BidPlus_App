@@ -1,4 +1,6 @@
+// contractor_bids_screen.dart
 import 'package:flutter/material.dart';
+import 'contractor_rfp_details_screen.dart';
 
 enum BidStatus { open, submitted, awarded }
 
@@ -49,9 +51,8 @@ class BidFilters {
       status: clearStatus ? null : (status ?? this.status),
       minBudget: clearMinBudget ? null : (minBudget ?? this.minBudget),
       maxBudget: clearMaxBudget ? null : (maxBudget ?? this.maxBudget),
-      beforeDeadline: clearBeforeDeadline
-          ? null
-          : (beforeDeadline ?? this.beforeDeadline),
+      beforeDeadline:
+          clearBeforeDeadline ? null : (beforeDeadline ?? this.beforeDeadline),
     );
   }
 
@@ -73,8 +74,6 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   BidFilters _filters = const BidFilters();
 
-  // ✅ بيانات تجريبية (بدّليها لاحقًا ببيانات من الباك-إند)
-  // ✅ IMPORTANT: ليست const لأن داخلها DateTime(...)
   final List<BidItem> _allBids = [
     BidItem(
       id: 'B-1001',
@@ -129,67 +128,25 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
     super.dispose();
   }
 
-  Color _bg() => const Color(0xFF0B1720);
-  Color _card() => const Color(0xFF0F2230);
-  Color _card2() => const Color(0xFF0C1C27);
-  Color _line() => const Color(0xFF1F3A4B);
-  Color _accent() => const Color(0xFF41C0FF);
-  Color _muted() => const Color(0xFF93A7B6);
+  // ── Colors
+  Color get _bg => const Color(0xFF0B1720);
+  Color get _card => const Color(0xFF0F2230);
+  Color get _card2 => const Color(0xFF0C1C27);
+  Color get _line => const Color(0xFF1F3A4B);
+  Color get _accent => const Color(0xFF41C0FF);
+  Color get _muted => const Color(0xFF93A7B6);
 
-  String _fmtDate(DateTime d) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return '${months[d.month - 1]} ${d.day}, ${d.year}';
-  }
-
-  List<BidItem> get _filteredBids {
-    final q = _searchCtrl.text.trim().toLowerCase();
-
-    bool matchesSearch(BidItem b) {
-      if (q.isEmpty) return true;
-      return b.title.toLowerCase().contains(q) ||
-          b.project.toLowerCase().contains(q) ||
-          b.location.toLowerCase().contains(q) ||
-          b.id.toLowerCase().contains(q);
+  // ── Status colors
+  Color _statusColor(BidStatus s) {
+    switch (s) {
+      case BidStatus.open:
+        return const Color(0xFF41C0FF);
+      case BidStatus.submitted:
+        return const Color(0xFFFFA940);
+      case BidStatus.awarded:
+        return const Color(0xFF52C41A);
     }
-
-    bool matchesFilters(BidItem b) {
-      if (_filters.status != null && b.status != _filters.status) return false;
-      if (_filters.minBudget != null && b.budget < _filters.minBudget!) {
-        return false;
-      }
-      if (_filters.maxBudget != null && b.budget > _filters.maxBudget!) {
-        return false;
-      }
-      if (_filters.beforeDeadline != null &&
-          b.deadline.isAfter(_filters.beforeDeadline!)) {
-        return false;
-      }
-      return true;
-    }
-
-    final out = _allBids
-        .where((b) => matchesSearch(b) && matchesFilters(b))
-        .toList();
-
-    out.sort((a, b) => a.deadline.compareTo(b.deadline));
-    return out;
   }
-
-  int _countByStatus(List<BidItem> list, BidStatus s) =>
-      list.where((e) => e.status == s).length;
 
   String _statusLabel(BidStatus s) {
     switch (s) {
@@ -213,204 +170,434 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
     }
   }
 
+  String _fmtDate(DateTime d) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${months[d.month - 1]} ${d.day}, ${d.year}';
+  }
+
+  bool _isOverdue(DateTime d) => d.isBefore(DateTime.now());
+
+  List<BidItem> get _filteredBids {
+    final q = _searchCtrl.text.trim().toLowerCase();
+    return _allBids.where((b) {
+      final matchSearch = q.isEmpty ||
+          b.title.toLowerCase().contains(q) ||
+          b.project.toLowerCase().contains(q) ||
+          b.location.toLowerCase().contains(q) ||
+          b.id.toLowerCase().contains(q);
+      final matchStatus =
+          _filters.status == null || b.status == _filters.status;
+      final matchMin =
+          _filters.minBudget == null || b.budget >= _filters.minBudget!;
+      final matchMax =
+          _filters.maxBudget == null || b.budget <= _filters.maxBudget!;
+      final matchDate = _filters.beforeDeadline == null ||
+          !b.deadline.isAfter(_filters.beforeDeadline!);
+      return matchSearch && matchStatus && matchMin && matchMax && matchDate;
+    }).toList()
+      ..sort((a, b) => a.deadline.compareTo(b.deadline));
+  }
+
+  int _countByStatus(List<BidItem> list, BidStatus s) =>
+      list.where((e) => e.status == s).length;
+
+  // ── Tap on bid → bottom sheet details
+  void _onTapBid(BidItem bid) {
+    final sc = _statusColor(bid.status);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: _card2,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Title + status
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    bid.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: sc.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: sc.withOpacity(0.4)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(_statusIcon(bid.status), color: sc, size: 14),
+                      const SizedBox(width: 5),
+                      Text(
+                        _statusLabel(bid.status),
+                        style: TextStyle(
+                          color: sc,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${bid.project} • ${bid.location}',
+              style: TextStyle(color: _muted, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+
+            // Details grid
+            _detailRow(Icons.tag_rounded, 'Bid ID', bid.id),
+            _detailRow(
+              Icons.payments_rounded,
+              'Budget',
+              '${bid.budget.toStringAsFixed(0)} SAR',
+            ),
+            _detailRow(
+              Icons.event_rounded,
+              'Deadline',
+              _fmtDate(bid.deadline),
+              valueColor: _isOverdue(bid.deadline) && bid.status == BidStatus.open
+                  ? Colors.redAccent
+                  : null,
+            ),
+            _detailRow(
+              Icons.location_on_outlined,
+              'Location',
+              bid.location,
+            ),
+
+            const SizedBox(height: 24),
+
+            // Action button
+            if (bid.status == BidStatus.open)
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _accent,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ContractorRFPDetailsScreen(
+                          rfpId: bid.id,
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.send_rounded, size: 18),
+                  label: const Text(
+                    'Submit Proposal',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _detailRow(IconData icon, String label, String value,
+      {Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Icon(icon, color: _muted, size: 18),
+          const SizedBox(width: 12),
+          Text(label, style: TextStyle(color: _muted, fontSize: 13)),
+          const Spacer(),
+          Text(
+            value,
+            style: TextStyle(
+              color: valueColor ?? Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Filters sheet
   void _openFiltersSheet() async {
     final res = await showModalBottomSheet<BidFilters>(
       context: context,
-      backgroundColor: _card2(),
+      backgroundColor: _card2,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (_) => _FiltersSheet(
         initial: _filters,
-        accent: _accent(),
-        muted: _muted(),
-        line: _line(),
+        accent: _accent,
+        muted: _muted,
+        line: _line,
       ),
     );
-
-    if (res != null) {
-      setState(() => _filters = res);
-    }
-  }
-
-  void _clearFilters() {
-    setState(() => _filters = const BidFilters());
-  }
-
-  void _onTapBid(BidItem bid) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Open bid details: ${bid.title}'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    if (res != null) setState(() => _filters = res);
   }
 
   @override
   Widget build(BuildContext context) {
     final list = _filteredBids;
-
     final openCount = _countByStatus(list, BidStatus.open);
     final submittedCount = _countByStatus(list, BidStatus.submitted);
     final awardedCount = _countByStatus(list, BidStatus.awarded);
+    final hasFilters = !_filters.isEmpty;
 
     return Scaffold(
-      backgroundColor: _bg(),
+      backgroundColor: _bg,
       appBar: AppBar(
-        backgroundColor: _bg(),
+        backgroundColor: _bg,
         elevation: 0,
-        title: const Text(
-          'Bids',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
+        title: const Text('Bids', style: TextStyle(fontWeight: FontWeight.w700)),
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.menu_rounded),
-          onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Menu'),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          },
-        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.tune_rounded),
-            onPressed: _openFiltersSheet,
-            tooltip: 'Filter',
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.tune_rounded,
+                  color: hasFilters ? _accent : Colors.white,
+                ),
+                onPressed: _openFiltersSheet,
+                tooltip: 'Filter',
+              ),
+              if (hasFilters)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: _accent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
-
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           children: [
-            _SearchBar(
-              controller: _searchCtrl,
-              hint: 'Search for a bid...',
-              card: _card(),
-              muted: _muted(),
-              accent: _accent(),
-              onChanged: (_) => setState(() {}),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
+            // Search
+            Container(
+              decoration: BoxDecoration(
+                color: _card,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              child: Row(
                 children: [
-                  if (!_filters.isEmpty)
-                    InkWell(
-                      onTap: _clearFilters,
-                      borderRadius: BorderRadius.circular(999),
-                      child: Padding(
+                  Icon(Icons.search_rounded, color: _muted),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchCtrl,
+                      onChanged: (_) => setState(() {}),
+                      style: const TextStyle(color: Colors.white),
+                      cursorColor: _accent,
+                      decoration: InputDecoration(
+                        hintText: 'Search for a bid...',
+                        hintStyle:
+                            TextStyle(color: _muted.withOpacity(0.7)),
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                  if (hasFilters)
+                    GestureDetector(
+                      onTap: () =>
+                          setState(() => _filters = const BidFilters()),
+                      child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
+                            horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: _accent.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(999),
+                          border:
+                              Border.all(color: _accent.withOpacity(0.4)),
                         ),
                         child: Text(
                           'Clear',
                           style: TextStyle(
-                            color: _accent(),
+                            color: _accent,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
                     ),
                   IconButton(
-                    icon: const Icon(Icons.tune_rounded),
-                    color: _muted(),
+                    icon: Icon(Icons.tune_rounded, color: _muted),
                     onPressed: _openFiltersSheet,
                   ),
                 ],
               ),
             ),
+
             const SizedBox(height: 12),
+
+            // Summary
             _SummaryCard(
-              card: _card(),
-              line: _line(),
-              accent: _accent(),
-              muted: _muted(),
+              card: _card,
+              line: _line,
+              accent: _accent,
+              muted: _muted,
               total: list.length,
               openCount: openCount,
               submittedCount: submittedCount,
               awardedCount: awardedCount,
+              statusColors: {
+                BidStatus.open: _statusColor(BidStatus.open),
+                BidStatus.submitted: _statusColor(BidStatus.submitted),
+                BidStatus.awarded: _statusColor(BidStatus.awarded),
+              },
             ),
+
             const SizedBox(height: 18),
-            _SectionHeader(
-              title: 'Open Bids',
-              count: openCount,
-              muted: _muted(),
-            ),
-            const SizedBox(height: 10),
-            ...list
-                .where((b) => b.status == BidStatus.open)
-                .map(
-                  (b) => _BidCard(
-                    bid: b,
-                    card: _card(),
-                    line: _line(),
-                    accent: _accent(),
-                    muted: _muted(),
-                    statusLabel: _statusLabel(b.status),
-                    statusIcon: _statusIcon(b.status),
-                    fmtDate: _fmtDate,
-                    onTap: () => _onTapBid(b),
-                  ),
-                ),
-            const SizedBox(height: 18),
-            _SectionHeader(
-              title: 'Submitted',
-              count: submittedCount,
-              muted: _muted(),
-            ),
-            const SizedBox(height: 10),
-            ...list
-                .where((b) => b.status == BidStatus.submitted)
-                .map(
-                  (b) => _BidCard(
-                    bid: b,
-                    card: _card(),
-                    line: _line(),
-                    accent: _accent(),
-                    muted: _muted(),
-                    statusLabel: _statusLabel(b.status),
-                    statusIcon: _statusIcon(b.status),
-                    fmtDate: _fmtDate,
-                    onTap: () => _onTapBid(b),
-                  ),
-                ),
-            const SizedBox(height: 18),
-            _SectionHeader(
-              title: 'Awarded',
-              count: awardedCount,
-              muted: _muted(),
-            ),
-            const SizedBox(height: 10),
-            ...list
-                .where((b) => b.status == BidStatus.awarded)
-                .map(
-                  (b) => _BidCard(
-                    bid: b,
-                    card: _card(),
-                    line: _line(),
-                    accent: _accent(),
-                    muted: _muted(),
-                    statusLabel: _statusLabel(b.status),
-                    statusIcon: _statusIcon(b.status),
-                    fmtDate: _fmtDate,
-                    onTap: () => _onTapBid(b),
-                  ),
-                ),
-            if (list.isEmpty) ...[
-              const SizedBox(height: 30),
+
+            // Open
+            if (openCount > 0) ...[
+              _SectionHeader(
+                title: 'Open Bids',
+                count: openCount,
+                muted: _muted,
+                color: _statusColor(BidStatus.open),
+              ),
+              const SizedBox(height: 10),
+              ...list
+                  .where((b) => b.status == BidStatus.open)
+                  .map((b) => _BidCard(
+                        bid: b,
+                        card: _card,
+                        line: _line,
+                        statusColor: _statusColor(b.status),
+                        muted: _muted,
+                        statusLabel: _statusLabel(b.status),
+                        statusIcon: _statusIcon(b.status),
+                        fmtDate: _fmtDate,
+                        isOverdue: _isOverdue(b.deadline),
+                        onTap: () => _onTapBid(b),
+                      )),
+              const SizedBox(height: 18),
+            ],
+
+            // Submitted
+            if (submittedCount > 0) ...[
+              _SectionHeader(
+                title: 'Submitted',
+                count: submittedCount,
+                muted: _muted,
+                color: _statusColor(BidStatus.submitted),
+              ),
+              const SizedBox(height: 10),
+              ...list
+                  .where((b) => b.status == BidStatus.submitted)
+                  .map((b) => _BidCard(
+                        bid: b,
+                        card: _card,
+                        line: _line,
+                        statusColor: _statusColor(b.status),
+                        muted: _muted,
+                        statusLabel: _statusLabel(b.status),
+                        statusIcon: _statusIcon(b.status),
+                        fmtDate: _fmtDate,
+                        isOverdue: false,
+                        onTap: () => _onTapBid(b),
+                      )),
+              const SizedBox(height: 18),
+            ],
+
+            // Awarded
+            if (awardedCount > 0) ...[
+              _SectionHeader(
+                title: 'Awarded',
+                count: awardedCount,
+                muted: _muted,
+                color: _statusColor(BidStatus.awarded),
+              ),
+              const SizedBox(height: 10),
+              ...list
+                  .where((b) => b.status == BidStatus.awarded)
+                  .map((b) => _BidCard(
+                        bid: b,
+                        card: _card,
+                        line: _line,
+                        statusColor: _statusColor(b.status),
+                        muted: _muted,
+                        statusLabel: _statusLabel(b.status),
+                        statusIcon: _statusIcon(b.status),
+                        fmtDate: _fmtDate,
+                        isOverdue: false,
+                        onTap: () => _onTapBid(b),
+                      )),
+            ],
+
+            if (list.isEmpty)
               Center(
-                child: Text(
-                  'No bids found',
-                  style: TextStyle(color: _muted(), fontSize: 14),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 40),
+                  child: Column(
+                    children: [
+                      Icon(Icons.search_off_rounded,
+                          color: _muted, size: 40),
+                      const SizedBox(height: 12),
+                      Text('No bids found',
+                          style: TextStyle(color: _muted, fontSize: 14)),
+                    ],
+                  ),
                 ),
               ),
-            ],
           ],
         ),
       ),
@@ -418,66 +605,11 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
   }
 }
 
-class _SearchBar extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-  final Color card;
-  final Color muted;
-  final Color accent;
-  final void Function(String) onChanged;
-  final Widget? trailing;
-
-  const _SearchBar({
-    required this.controller,
-    required this.hint,
-    required this.card,
-    required this.muted,
-    required this.accent,
-    required this.onChanged,
-    this.trailing,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: card,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-      child: Row(
-        children: [
-          Icon(Icons.search_rounded, color: muted),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              onChanged: onChanged,
-              style: const TextStyle(color: Colors.white),
-              cursorColor: accent,
-              decoration: InputDecoration(
-                hintText: hint,
-                hintStyle: TextStyle(color: muted.withOpacity(0.7)),
-                border: InputBorder.none,
-              ),
-            ),
-          ),
-          ?trailing,
-        ],
-      ),
-    );
-  }
-}
-
+// ── Summary Card
 class _SummaryCard extends StatelessWidget {
-  final Color card;
-  final Color line;
-  final Color accent;
-  final Color muted;
-  final int total;
-  final int openCount;
-  final int submittedCount;
-  final int awardedCount;
+  final Color card, line, accent, muted;
+  final int total, openCount, submittedCount, awardedCount;
+  final Map<BidStatus, Color> statusColors;
 
   const _SummaryCard({
     required this.card,
@@ -488,6 +620,7 @@ class _SummaryCard extends StatelessWidget {
     required this.openCount,
     required this.submittedCount,
     required this.awardedCount,
+    required this.statusColors,
   });
 
   @override
@@ -512,15 +645,11 @@ class _SummaryCard extends StatelessWidget {
                 child: Text(
                   '$done of $total bids processed',
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
+                      color: Colors.white, fontWeight: FontWeight.w700),
                 ),
               ),
-              Text(
-                '${(progress * 100).round()}%',
-                style: TextStyle(color: muted),
-              ),
+              Text('${(progress * 100).round()}%',
+                  style: TextStyle(color: muted)),
             ],
           ),
           const SizedBox(height: 12),
@@ -537,25 +666,19 @@ class _SummaryCard extends StatelessWidget {
           Row(
             children: [
               _MiniPill(
-                label: 'Open',
-                value: openCount,
-                accent: accent,
-                muted: muted,
-              ),
+                  label: 'Open',
+                  value: openCount,
+                  color: statusColors[BidStatus.open]!),
               const SizedBox(width: 8),
               _MiniPill(
-                label: 'Submitted',
-                value: submittedCount,
-                accent: accent,
-                muted: muted,
-              ),
+                  label: 'Submitted',
+                  value: submittedCount,
+                  color: statusColors[BidStatus.submitted]!),
               const SizedBox(width: 8),
               _MiniPill(
-                label: 'Awarded',
-                value: awardedCount,
-                accent: accent,
-                muted: muted,
-              ),
+                  label: 'Awarded',
+                  value: awardedCount,
+                  color: statusColors[BidStatus.awarded]!),
             ],
           ),
         ],
@@ -567,15 +690,10 @@ class _SummaryCard extends StatelessWidget {
 class _MiniPill extends StatelessWidget {
   final String label;
   final int value;
-  final Color accent;
-  final Color muted;
+  final Color color;
 
-  const _MiniPill({
-    required this.label,
-    required this.value,
-    required this.accent,
-    required this.muted,
-  });
+  const _MiniPill(
+      {required this.label, required this.value, required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -583,18 +701,21 @@ class _MiniPill extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.04),
+          color: color.withOpacity(0.08),
           borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.withOpacity(0.2)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(label, style: TextStyle(color: muted, fontSize: 12)),
-            const SizedBox(width: 6),
-            Text(
-              '$value',
-              style: TextStyle(color: accent, fontWeight: FontWeight.w800),
-            ),
+            Text(label,
+                style: TextStyle(color: color.withOpacity(0.8), fontSize: 11)),
+            const SizedBox(width: 5),
+            Text('$value',
+                style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13)),
           ],
         ),
       ),
@@ -602,39 +723,53 @@ class _MiniPill extends StatelessWidget {
   }
 }
 
+// ── Section Header
 class _SectionHeader extends StatelessWidget {
   final String title;
   final int count;
   final Color muted;
+  final Color color;
 
   const _SectionHeader({
     required this.title,
     required this.count,
     required this.muted,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
+        Container(
+          width: 4,
+          height: 18,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+        const SizedBox(width: 10),
         Text(
           title,
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 18,
+            fontSize: 17,
             fontWeight: FontWeight.w800,
           ),
         ),
         const Spacer(),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
+            color: color.withOpacity(0.1),
             borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: color.withOpacity(0.25)),
           ),
           child: Text(
             '$count bids',
-            style: TextStyle(color: muted, fontSize: 12),
+            style: TextStyle(
+                color: color, fontSize: 12, fontWeight: FontWeight.w700),
           ),
         ),
       ],
@@ -642,26 +777,26 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
+// ── Bid Card
 class _BidCard extends StatelessWidget {
   final BidItem bid;
-  final Color card;
-  final Color line;
-  final Color accent;
-  final Color muted;
+  final Color card, line, statusColor, muted;
   final String statusLabel;
   final IconData statusIcon;
   final String Function(DateTime) fmtDate;
+  final bool isOverdue;
   final VoidCallback onTap;
 
   const _BidCard({
     required this.bid,
     required this.card,
     required this.line,
-    required this.accent,
+    required this.statusColor,
     required this.muted,
     required this.statusLabel,
     required this.statusIcon,
     required this.fmtDate,
+    required this.isOverdue,
     required this.onTap,
   });
 
@@ -674,130 +809,124 @@ class _BidCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: line),
       ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(18),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.04),
-                  borderRadius: BorderRadius.circular(14),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          splashColor: statusColor.withOpacity(0.08),
+          highlightColor: statusColor.withOpacity(0.04),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: statusColor.withOpacity(0.25)),
+                  ),
+                  child: Icon(statusIcon, color: statusColor, size: 20),
                 ),
-                child: Icon(statusIcon, color: accent),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        bid.title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${bid.project} • ${bid.location}',
+                        style: TextStyle(color: muted, fontSize: 12),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          _chip(
+                            Icons.payments_rounded,
+                            '${bid.budget.toStringAsFixed(0)} SAR',
+                          ),
+                          _chip(
+                            Icons.event_rounded,
+                            'Due ${fmtDate(bid.deadline)}',
+                            color: isOverdue ? Colors.redAccent : null,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      bid.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(999),
+                        border:
+                            Border.all(color: statusColor.withOpacity(0.3)),
+                      ),
+                      child: Text(
+                        statusLabel,
+                        style: TextStyle(
+                          color: statusColor,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${bid.project} • ${bid.location}',
-                      style: TextStyle(color: muted, fontSize: 12),
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        _InfoChip(
-                          icon: Icons.payments_rounded,
-                          text: '${bid.budget.toStringAsFixed(0)} SAR',
-                          muted: muted,
-                        ),
-                        const SizedBox(width: 8),
-                        _InfoChip(
-                          icon: Icons.event_rounded,
-                          text: 'Due ${fmtDate(bid.deadline)}',
-                          muted: muted,
-                        ),
-                      ],
-                    ),
+                    const SizedBox(height: 12),
+                    Icon(Icons.chevron_right_rounded,
+                        color: muted, size: 20),
                   ],
                 ),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: accent.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      statusLabel,
-                      style: TextStyle(
-                        color: accent,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Icon(Icons.chevron_right_rounded, color: muted),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
-}
 
-class _InfoChip extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  final Color muted;
-
-  const _InfoChip({
-    required this.icon,
-    required this.text,
-    required this.muted,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _chip(IconData icon, String text, {Color? color}) {
+    final c = color ?? muted;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.04),
+        color: c.withOpacity(0.07),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: muted),
-          const SizedBox(width: 6),
-          Text(text, style: TextStyle(color: muted, fontSize: 12)),
+          Icon(icon, size: 13, color: c),
+          const SizedBox(width: 4),
+          Text(text, style: TextStyle(color: c, fontSize: 11)),
         ],
       ),
     );
   }
 }
 
+// ── Filters Sheet
 class _FiltersSheet extends StatefulWidget {
   final BidFilters initial;
-  final Color accent;
-  final Color muted;
-  final Color line;
+  final Color accent, muted, line;
 
   const _FiltersSheet({
     required this.initial,
@@ -821,11 +950,9 @@ class _FiltersSheetState extends State<_FiltersSheet> {
     super.initState();
     _status = widget.initial.status;
     _minCtrl = TextEditingController(
-      text: widget.initial.minBudget?.toStringAsFixed(0) ?? '',
-    );
+        text: widget.initial.minBudget?.toStringAsFixed(0) ?? '');
     _maxCtrl = TextEditingController(
-      text: widget.initial.maxBudget?.toStringAsFixed(0) ?? '',
-    );
+        text: widget.initial.maxBudget?.toStringAsFixed(0) ?? '');
     _before = widget.initial.beforeDeadline;
   }
 
@@ -834,6 +961,15 @@ class _FiltersSheetState extends State<_FiltersSheet> {
     _minCtrl.dispose();
     _maxCtrl.dispose();
     super.dispose();
+  }
+
+  int get _activeCount {
+    int c = 0;
+    if (_status != null) c++;
+    if (_minCtrl.text.isNotEmpty) c++;
+    if (_maxCtrl.text.isNotEmpty) c++;
+    if (_before != null) c++;
+    return c;
   }
 
   double? _toDouble(String s) {
@@ -846,132 +982,109 @@ class _FiltersSheetState extends State<_FiltersSheet> {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
+        left: 20,
+        right: 20,
         top: 14,
-        bottom: 16 + MediaQuery.of(context).viewInsets.bottom,
+        bottom: 20 + MediaQuery.of(context).viewInsets.bottom,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 44,
-            height: 5,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
-              borderRadius: BorderRadius.circular(999),
+          // Handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.18),
+                borderRadius: BorderRadius.circular(999),
+              ),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
+
+          // Header
           Row(
             children: [
               const Text(
                 'Filters',
                 style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                ),
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800),
               ),
-              const Spacer(),
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    _status = null;
-                    _minCtrl.text = '';
-                    _maxCtrl.text = '';
-                    _before = null;
-                  });
-                },
-                child: Text(
-                  'Reset',
-                  style: TextStyle(
-                    color: widget.accent,
-                    fontWeight: FontWeight.w800,
+              if (_activeCount > 0) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: widget.accent.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '$_activeCount active',
+                    style: TextStyle(
+                        color: widget.accent,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700),
                   ),
                 ),
+              ],
+              const Spacer(),
+              TextButton(
+                onPressed: () => setState(() {
+                  _status = null;
+                  _minCtrl.text = '';
+                  _maxCtrl.text = '';
+                  _before = null;
+                }),
+                child: Text('Reset all',
+                    style: TextStyle(
+                        color: widget.accent, fontWeight: FontWeight.w700)),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text('Status', style: TextStyle(color: widget.muted)),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _ChoiceChip(
-                label: 'Open',
-                selected: _status == BidStatus.open,
-                onTap: () => setState(() => _status = BidStatus.open),
-                accent: widget.accent,
-              ),
-              _ChoiceChip(
-                label: 'Submitted',
-                selected: _status == BidStatus.submitted,
-                onTap: () => setState(() => _status = BidStatus.submitted),
-                accent: widget.accent,
-              ),
-              _ChoiceChip(
-                label: 'Awarded',
-                selected: _status == BidStatus.awarded,
-                onTap: () => setState(() => _status = BidStatus.awarded),
-                accent: widget.accent,
-              ),
-              _ChoiceChip(
-                label: 'Any',
-                selected: _status == null,
-                onTap: () => setState(() => _status = null),
-                accent: widget.accent,
-              ),
-            ],
-          ),
-
           const SizedBox(height: 16),
 
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Budget range (SAR)',
-              style: TextStyle(color: widget.muted),
-            ),
-          ),
+          // Status
+          _label('Status'),
           const SizedBox(height: 10),
           Row(
             children: [
-              Expanded(
-                child: _Field(
-                  controller: _minCtrl,
-                  hint: 'Min',
-                  line: widget.line,
-                  muted: widget.muted,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _Field(
-                  controller: _maxCtrl,
-                  hint: 'Max',
-                  line: widget.line,
-                  muted: widget.muted,
-                ),
-              ),
+              _chip('Any', _status == null,
+                  () => setState(() => _status = null)),
+              const SizedBox(width: 8),
+              _chip('Open', _status == BidStatus.open,
+                  () => setState(() => _status = BidStatus.open)),
+              const SizedBox(width: 8),
+              _chip('Submitted', _status == BidStatus.submitted,
+                  () => setState(() => _status = BidStatus.submitted)),
+              const SizedBox(width: 8),
+              _chip('Awarded', _status == BidStatus.awarded,
+                  () => setState(() => _status = BidStatus.awarded)),
             ],
           ),
+          const SizedBox(height: 18),
 
-          const SizedBox(height: 16),
-
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'Deadline before',
-              style: TextStyle(color: widget.muted),
-            ),
+          // Budget
+          _label('Budget Range (SAR)'),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(child: _field(_minCtrl, 'Min budget')),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Text('—',
+                    style: TextStyle(color: widget.muted, fontSize: 16)),
+              ),
+              Expanded(child: _field(_maxCtrl, 'Max budget')),
+            ],
           ),
+          const SizedBox(height: 18),
+
+          // Deadline
+          _label('Deadline Before'),
           const SizedBox(height: 10),
           InkWell(
             onTap: () async {
@@ -982,43 +1095,54 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                 firstDate: DateTime(now.year - 1),
                 lastDate: DateTime(now.year + 5),
               );
-              if (picked != null) {
-                setState(() => _before = picked);
-              }
+              if (picked != null) setState(() => _before = picked);
             },
             borderRadius: BorderRadius.circular(14),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
-                border: Border.all(color: widget.line),
+                border: Border.all(
+                    color: _before != null
+                        ? widget.accent.withOpacity(0.5)
+                        : widget.line),
                 borderRadius: BorderRadius.circular(14),
-                color: Colors.white.withOpacity(0.03),
+                color: _before != null
+                    ? widget.accent.withOpacity(0.05)
+                    : Colors.white.withOpacity(0.03),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.event_rounded, color: widget.muted),
+                  Icon(Icons.event_rounded,
+                      color: _before != null ? widget.accent : widget.muted,
+                      size: 18),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       _before == null
                           ? 'Any date'
-                          : '${_before!.year}-${_before!.month}-${_before!.day}',
-                      style: const TextStyle(color: Colors.white),
+                          : '${_before!.year}-${_before!.month.toString().padLeft(2, '0')}-${_before!.day.toString().padLeft(2, '0')}',
+                      style: TextStyle(
+                        color:
+                            _before != null ? Colors.white : widget.muted,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                   if (_before != null)
-                    IconButton(
-                      onPressed: () => setState(() => _before = null),
-                      icon: Icon(Icons.close_rounded, color: widget.muted),
+                    GestureDetector(
+                      onTap: () => setState(() => _before = null),
+                      child: Icon(Icons.close_rounded,
+                          color: widget.muted, size: 18),
                     ),
                 ],
               ),
             ),
           ),
+          const SizedBox(height: 20),
 
-          const SizedBox(height: 18),
-
+          // Buttons
           Row(
             children: [
               Expanded(
@@ -1028,14 +1152,11 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+                        borderRadius: BorderRadius.circular(14)),
                   ),
                   onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(fontWeight: FontWeight.w800),
-                  ),
+                  child: const Text('Cancel',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
                 ),
               ),
               const SizedBox(width: 10),
@@ -1046,24 +1167,20 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                     foregroundColor: Colors.black,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(14)),
+                  ),
+                  onPressed: () => Navigator.pop(
+                    context,
+                    BidFilters(
+                      status: _status,
+                      minBudget: _toDouble(_minCtrl.text),
+                      maxBudget: _toDouble(_maxCtrl.text),
+                      beforeDeadline: _before,
                     ),
                   ),
-                  onPressed: () {
-                    final minB = _toDouble(_minCtrl.text);
-                    final maxB = _toDouble(_maxCtrl.text);
-
-                    final filters = BidFilters(
-                      status: _status,
-                      minBudget: minB,
-                      maxBudget: maxB,
-                      beforeDeadline: _before,
-                    );
-                    Navigator.pop(context, filters);
-                  },
-                  child: const Text(
-                    'Apply',
-                    style: TextStyle(fontWeight: FontWeight.w900),
+                  child: Text(
+                    _activeCount > 0 ? 'Apply ($_activeCount)' : 'Apply',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),
               ),
@@ -1073,85 +1190,63 @@ class _FiltersSheetState extends State<_FiltersSheet> {
       ),
     );
   }
-}
 
-class _ChoiceChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  final Color accent;
+  Widget _label(String text) => Align(
+        alignment: Alignment.centerLeft,
+        child: Text(text,
+            style: TextStyle(
+                color: widget.muted,
+                fontSize: 13,
+                fontWeight: FontWeight.w600)),
+      );
 
-  const _ChoiceChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-    required this.accent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: selected
-              ? accent.withOpacity(0.16)
-              : Colors.white.withOpacity(0.04),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
+  Widget _chip(String label, bool selected, VoidCallback onTap) =>
+      GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
             color: selected
-                ? accent.withOpacity(0.7)
-                : Colors.white.withOpacity(0.06),
+                ? widget.accent.withOpacity(0.16)
+                : Colors.white.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected
+                  ? widget.accent.withOpacity(0.7)
+                  : Colors.white.withOpacity(0.08),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? widget.accent : Colors.white70,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
           ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? accent : Colors.white,
-            fontWeight: FontWeight.w800,
-            fontSize: 12,
+      );
+
+  Widget _field(TextEditingController ctrl, String hint) => TextField(
+        controller: ctrl,
+        keyboardType: TextInputType.number,
+        style: const TextStyle(color: Colors.white),
+        onChanged: (_) => setState(() {}),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle:
+              TextStyle(color: widget.muted.withOpacity(0.6), fontSize: 13),
+          filled: true,
+          fillColor: Colors.white.withOpacity(0.03),
+          enabledBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: widget.line),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: widget.accent),
+            borderRadius: BorderRadius.circular(14),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _Field extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-  final Color line;
-  final Color muted;
-
-  const _Field({
-    required this.controller,
-    required this.hint,
-    required this.line,
-    required this.muted,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      keyboardType: TextInputType.number,
-      style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: muted.withOpacity(0.7)),
-        filled: true,
-        fillColor: Colors.white.withOpacity(0.03),
-        enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: line),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: line),
-          borderRadius: BorderRadius.circular(14),
-        ),
-      ),
-    );
-  }
+      );
 }
