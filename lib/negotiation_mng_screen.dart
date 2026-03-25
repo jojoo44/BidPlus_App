@@ -1,134 +1,309 @@
+// negotiation_mng_screen.dart
 import 'package:flutter/material.dart';
-import 'qualified_contractors_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../main.dart';
+import 'manager_negotiation_screen.dart';
 
-// تعريف الألوان بناءً على صورك
-class AppColors {
-  static const Color background = Color(0xFF0B1015); // الخلفية الداكنة جداً
-  static const Color surface = Color(0xFF161B22); // لون الكروت (Cards)
-  static const Color primaryPurple = Color(
-    0xFF6342E8,
-  ); // البنفسجي حق Suggestion
-  static const Color accentBlue = Color(0xFF2188FF); // الأزرق حق Create New RFP
-  static const Color textGrey = Color(0xFF8B949E); // الرمادي للنصوص الفرعية
+class NegotiationArchiveScreen extends StatefulWidget {
+  const NegotiationArchiveScreen({super.key});
+
+  @override
+  State<NegotiationArchiveScreen> createState() =>
+      _NegotiationArchiveScreenState();
 }
 
-class NegotiationArchiveScreen extends StatelessWidget {
-  const NegotiationArchiveScreen({super.key});
+class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
+  static const Color background = Color(0xFF0B1015);
+  static const Color surface = Color(0xFF161B22);
+  static const Color primaryPurple = Color(0xFF6342E8);
+  static const Color accentBlue = Color(0xFF2188FF);
+  static const Color textGrey = Color(0xFF8B949E);
+
+  List<Map<String, dynamic>> _sessions = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSessions();
+  }
+
+  Future<void> _loadSessions() async {
+    setState(() => _isLoading = true);
+    try {
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) return;
+
+      // جيب الـ RFPs الخاصة بالمدير
+      final rfpData = await supabase
+          .from('RFP')
+          .select('rfpID')
+          .eq('creatorUser', userId);
+
+      final rfpIds = (rfpData as List).map((r) => r['rfpID'].toString()).toList();
+      if (rfpIds.isEmpty) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      // جيب الـ NegoSessions المرتبطة بهذه الـ RFPs
+      final sessionsData = await supabase
+          .from('NegoSession')
+          .select()
+          .inFilter('rfp_id', rfpIds)
+          .order('start_date', ascending: false);
+
+      // لكل session جيب عنوان الـ RFP واسم الكونتراكتر
+      final enriched = <Map<String, dynamic>>[];
+      for (final session in sessionsData) {
+        final rfpId = session['rfp_id']?.toString();
+
+        // جيب بيانات الـ RFP
+        Map<String, dynamic> rfpInfo = {};
+        if (rfpId != null) {
+          try {
+            final rfp = await supabase
+                .from('RFP')
+                .select('title, budget')
+                .eq('rfpID', rfpId)
+                .single();
+            rfpInfo = rfp;
+          } catch (_) {}
+        }
+
+        // جيب اسم الكونتراكتر من الـ proposal المقبول
+        String contractorName = 'Unknown';
+        if (rfpId != null) {
+          try {
+            final proposal = await supabase
+                .from('proposals')
+                .select('submitterUserId')
+                .eq('RFP', rfpId)
+                .eq('status', 'Accepted')
+                .maybeSingle();
+
+            if (proposal != null && proposal['submitterUserId'] != null) {
+              final user = await supabase
+                  .from('User')
+                  .select('username')
+                  .eq('id', proposal['submitterUserId'])
+                  .single();
+              contractorName = user['username'] ?? 'Unknown';
+            }
+          } catch (_) {}
+        }
+
+        enriched.add({
+          ...session,
+          'rfpTitle': rfpInfo['title'] ?? '—',
+          'rfpBudget': rfpInfo['budget'],
+          'contractorName': contractorName,
+        });
+      }
+
+      if (mounted) {
+        setState(() {
+          _sessions = enriched;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  int get _activeCount =>
+      _sessions.where((s) => s['status'] == 'Active').length;
+  int get _completedCount =>
+      _sessions.where((s) => s['status'] == 'Completed').length;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         title: const Text(
-          "AI Negotiation Archive",
+          'Negotiation Sessions',
           style: TextStyle(
             color: Colors.white,
             fontWeight: FontWeight.bold,
-            fontSize: 22,
+            fontSize: 20,
           ),
         ),
-        actions: [
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.notifications_none, color: Colors.white),
-          ),
-          const CircleAvatar(
-            radius: 15,
-            backgroundImage: NetworkImage('https://via.placeholder.com/150'),
-          ),
-          const SizedBox(width: 16),
-        ],
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // إحصائيات سريعة تشبه نمط الداشبورد حقك
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                _buildMiniStat("Active", "4"),
-                const SizedBox(width: 12),
-                _buildMiniStat("Completed", "18"),
-              ],
-            ),
-          ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: accentBlue))
+          : RefreshIndicator(
+              onRefresh: _loadSessions,
+              color: accentBlue,
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  // Stats
+                  Row(
+                    children: [
+                      _buildMiniStat('Active', _activeCount.toString(),
+                          Colors.orangeAccent),
+                      const SizedBox(width: 12),
+                      _buildMiniStat('Completed', _completedCount.toString(),
+                          Colors.greenAccent),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
 
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8),
-            child: Text(
-              "Recent Negotiations",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+                  const Text(
+                    'Negotiation Sessions',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  if (_sessions.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 40),
+                        child: Column(
+                          children: [
+                            const Icon(Icons.handshake_outlined,
+                                color: textGrey, size: 48),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'No negotiation sessions yet',
+                              style: TextStyle(color: textGrey),
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Accept a proposal to start negotiation',
+                              style:
+                                  TextStyle(color: textGrey, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    ..._sessions.map((session) => _buildSessionCard(session)),
+                ],
               ),
             ),
-          ),
+    );
+  }
 
-          Expanded(
-            child: ListView.builder(
-              itemCount: 5,
-              itemBuilder: (context, index) {
-                return _buildNegotiationItem(
-                  title: "Modern Villa Project",
-                  contractor: "Al-Fardan Contracting",
-                  status: index % 2 == 0 ? "In Progress" : "Closed",
-                  price: "\$50,000",
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-
-      // زر بدء محادثة جديدة بنفس لون زر "Create New RFP" في صورتك
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const QualifiedContractorsScreen(),
-            ),
-          );
-          // هنا تربط واجهة دعوة المقاولين
-        },
-        backgroundColor: AppColors.accentBlue,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          "New Negotiation",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+  Widget _buildMiniStat(String label, String count, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: const TextStyle(color: textGrey, fontSize: 13)),
+            const SizedBox(height: 8),
+            Text(count,
+                style: TextStyle(
+                    color: color,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold)),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildMiniStat(String label, String count) {
-    return Expanded(
+  Widget _buildSessionCard(Map<String, dynamic> session) {
+    final status = session['status'] ?? 'Active';
+    final isActive = status == 'Active';
+    final statusColor = isActive ? Colors.orangeAccent : Colors.greenAccent;
+    final startDate = session['start_date'] != null
+        ? _fmtDate(session['start_date'])
+        : '—';
+
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ManagerNegotiationScreen(
+            sessionId: session['session_id'].toString(),
+            rfpTitle: session['rfpTitle'] ?? '—',
+            contractorName: session['contractorName'] ?? '—',
+            budget: session['rfpBudget'],
+          ),
+        ),
+      ).then((_) => _loadSessions()),
       child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: surface,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: statusColor.withOpacity(0.15)),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Text(
-              label,
-              style: const TextStyle(color: AppColors.textGrey, fontSize: 14),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              count,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: primaryPurple.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
               ),
+              child: const Icon(Icons.handshake_outlined,
+                  color: primaryPurple),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    session['rfpTitle'] ?? '—',
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    session['contractorName'] ?? '—',
+                    style: const TextStyle(color: textGrey, fontSize: 12),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Started: $startDate',
+                    style: const TextStyle(color: textGrey, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    status,
+                    style: TextStyle(
+                        color: statusColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Icon(Icons.chevron_right_rounded,
+                    color: textGrey, size: 20),
+              ],
             ),
           ],
         ),
@@ -136,79 +311,16 @@ class NegotiationArchiveScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildNegotiationItem({
-    required String title,
-    required String contractor,
-    required String status,
-    required String price,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppColors.primaryPurple.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.handshake_outlined,
-              color: AppColors.primaryPurple,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  contractor,
-                  style: const TextStyle(
-                    color: AppColors.textGrey,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                price,
-                style: const TextStyle(
-                  color: Colors.greenAccent,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                status,
-                style: TextStyle(
-                  color: status == "In Progress"
-                      ? Colors.orangeAccent
-                      : AppColors.textGrey,
-                  fontSize: 11,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+  String _fmtDate(String d) {
+    try {
+      final dt = DateTime.parse(d);
+      const m = [
+        'Jan','Feb','Mar','Apr','May','Jun',
+        'Jul','Aug','Sep','Oct','Nov','Dec'
+      ];
+      return '${m[dt.month - 1]} ${dt.day}, ${dt.year}';
+    } catch (_) {
+      return d;
+    }
   }
 }

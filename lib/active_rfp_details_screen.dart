@@ -1,5 +1,6 @@
+// active_rfp_details_screen.dart
 import 'package:flutter/material.dart';
-import 'manager_negotiation_screen.dart';
+import 'negotiation_mng_screen.dart'; 
 import 'rfp_details_screen.dart';
 import '../main.dart';
 
