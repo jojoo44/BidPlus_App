@@ -34,31 +34,39 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
       final userId = supabase.auth.currentUser?.id;
       if (userId == null) return;
 
-      // جيب الـ RFPs الخاصة بالمدير
       final rfpData = await supabase
           .from('RFP')
           .select('rfpID')
           .eq('creatorUser', userId);
 
-      final rfpIds = (rfpData as List).map((r) => r['rfpID'].toString()).toList();
+      // Keep as int — rfpID is int8 in Supabase
+      final rfpIds = (rfpData as List).map((r) => r['rfpID'] as int).toList();
+
+      print('DEBUG rfpIds: $rfpIds');
+
       if (rfpIds.isEmpty) {
         if (mounted) setState(() => _isLoading = false);
         return;
       }
 
-      // جيب الـ NegoSessions المرتبطة بهذه الـ RFPs
       final sessionsData = await supabase
           .from('NegoSession')
           .select()
           .inFilter('rfp_id', rfpIds)
           .order('start_date', ascending: false);
 
-      // لكل session جيب عنوان الـ RFP واسم الكونتراكتر
+      print('DEBUG sessionsData: $sessionsData');
+
       final enriched = <Map<String, dynamic>>[];
       for (final session in sessionsData) {
-        final rfpId = session['rfp_id']?.toString();
+        // rfp_id is int8 — keep as int
+        final rfpId = session['rfp_id'] as int?;
 
-        // جيب بيانات الـ RFP
+        print(
+          'DEBUG processing session: ${session['session_id']}, rfp_id: $rfpId',
+        );
+
+        // Get RFP info
         Map<String, dynamic> rfpInfo = {};
         if (rfpId != null) {
           try {
@@ -68,30 +76,55 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
                 .eq('rfpID', rfpId)
                 .single();
             rfpInfo = rfp;
-          } catch (_) {}
+            print('DEBUG rfpInfo: $rfpInfo');
+          } catch (e) {
+            print('DEBUG RFP fetch error for rfpId $rfpId: $e');
+          }
         }
 
-        // جيب اسم الكونتراكتر من الـ proposal المقبول
+        // Get contractor name via proposals — proposals.RFP is int8, pass int directly
         String contractorName = 'Unknown';
         if (rfpId != null) {
           try {
-            final proposal = await supabase
+            final proposals = await supabase
                 .from('proposals')
-                .select('submitterUserId')
+                .select('submitterUserId, status')
                 .eq('RFP', rfpId)
-                .eq('status', 'Accepted')
-                .maybeSingle();
+                .order('ProposalID', ascending: false);
 
-            if (proposal != null && proposal['submitterUserId'] != null) {
+            print('DEBUG proposals for rfp $rfpId: $proposals');
+
+            String? contractorId;
+            for (final p in proposals) {
+              if (p['status'] == 'Accepted') {
+                contractorId = p['submitterUserId']?.toString();
+                break;
+              }
+            }
+            contractorId ??= (proposals as List).isNotEmpty
+                ? proposals.first['submitterUserId']?.toString()
+                : null;
+
+            print('DEBUG contractorId: $contractorId');
+
+            if (contractorId != null) {
               final user = await supabase
                   .from('User')
                   .select('username')
-                  .eq('id', proposal['submitterUserId'])
-                  .single();
-              contractorName = user['username'] ?? 'Unknown';
+                  .eq('id', contractorId)
+                  .maybeSingle();
+
+              print('DEBUG user result: $user');
+              contractorName = user?['username'] ?? 'Unknown';
+            } else {
+              print('DEBUG no contractorId found for rfp $rfpId');
             }
-          } catch (_) {}
+          } catch (e) {
+            print('DEBUG contractor fetch error for rfp $rfpId: $e');
+          }
         }
+
+        print('DEBUG final contractorName: $contractorName');
 
         enriched.add({
           ...session,
@@ -108,6 +141,7 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
         });
       }
     } catch (e) {
+      print('DEBUG _loadSessions top-level error: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -141,18 +175,22 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  // Stats
                   Row(
                     children: [
-                      _buildMiniStat('Active', _activeCount.toString(),
-                          Colors.orangeAccent),
+                      _buildMiniStat(
+                        'Active',
+                        _activeCount.toString(),
+                        Colors.orangeAccent,
+                      ),
                       const SizedBox(width: 12),
-                      _buildMiniStat('Completed', _completedCount.toString(),
-                          Colors.greenAccent),
+                      _buildMiniStat(
+                        'Completed',
+                        _completedCount.toString(),
+                        Colors.greenAccent,
+                      ),
                     ],
                   ),
                   const SizedBox(height: 20),
-
                   const Text(
                     'Negotiation Sessions',
                     style: TextStyle(
@@ -162,15 +200,17 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-
                   if (_sessions.isEmpty)
                     Center(
                       child: Padding(
                         padding: const EdgeInsets.only(top: 40),
                         child: Column(
                           children: [
-                            const Icon(Icons.handshake_outlined,
-                                color: textGrey, size: 48),
+                            const Icon(
+                              Icons.handshake_outlined,
+                              color: textGrey,
+                              size: 48,
+                            ),
                             const SizedBox(height: 12),
                             const Text(
                               'No negotiation sessions yet',
@@ -179,8 +219,7 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
                             const SizedBox(height: 6),
                             const Text(
                               'Accept a proposal to start negotiation',
-                              style:
-                                  TextStyle(color: textGrey, fontSize: 12),
+                              style: TextStyle(color: textGrey, fontSize: 12),
                             ),
                           ],
                         ),
@@ -206,14 +245,16 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label,
-                style: const TextStyle(color: textGrey, fontSize: 13)),
+            Text(label, style: const TextStyle(color: textGrey, fontSize: 13)),
             const SizedBox(height: 8),
-            Text(count,
-                style: TextStyle(
-                    color: color,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold)),
+            Text(
+              count,
+              style: TextStyle(
+                color: color,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ],
         ),
       ),
@@ -256,8 +297,7 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
                 color: primaryPurple.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.handshake_outlined,
-                  color: primaryPurple),
+              child: const Icon(Icons.handshake_outlined, color: primaryPurple),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -267,7 +307,9 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
                   Text(
                     session['rfpTitle'] ?? '—',
                     style: const TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold),
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -287,7 +329,9 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 4),
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withOpacity(0.15),
                     borderRadius: BorderRadius.circular(20),
@@ -295,14 +339,18 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
                   child: Text(
                     status,
                     style: TextStyle(
-                        color: statusColor,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700),
+                      color: statusColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Icon(Icons.chevron_right_rounded,
-                    color: textGrey, size: 20),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: textGrey,
+                  size: 20,
+                ),
               ],
             ),
           ],
@@ -315,8 +363,18 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
     try {
       final dt = DateTime.parse(d);
       const m = [
-        'Jan','Feb','Mar','Apr','May','Jun',
-        'Jul','Aug','Sep','Oct','Nov','Dec'
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
       ];
       return '${m[dt.month - 1]} ${dt.day}, ${dt.year}';
     } catch (_) {
