@@ -6,6 +6,7 @@ import 'contractor_bids_screen.dart';
 import 'contractor_tasks_screen.dart';
 import 'contractor_notifications_screen.dart';
 import 'contractor_negotiation_screen.dart';
+import 'contractor_negotiation_archive_screen.dart';
 import 'contractor_rfp_details_screen.dart';
 import 'profile_screen.dart';
 import 'login_screen.dart';
@@ -515,7 +516,7 @@ class _ContractorDashboardScreenState
                       context,
                       MaterialPageRoute(
                         builder: (_) =>
-                            const ContractorNegotiationScreen(),
+                            const ContractorNegotiationArchiveScreen(),
                       ),
                     ),
                   ),
