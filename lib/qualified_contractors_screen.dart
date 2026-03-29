@@ -1,6 +1,5 @@
+// qualified_contractors_screen.dart
 import 'package:flutter/material.dart';
-
-// استيراد صفحة المعايير (تأكد من مطابقة اسم الملف)
 import 'criteria_selection_screen.dart';
 
 class QualifiedContractorsScreen extends StatelessWidget {
@@ -9,7 +8,7 @@ class QualifiedContractorsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1219), // نفس خلفيتك
+      backgroundColor: const Color(0xFF0D1219),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -39,12 +38,8 @@ class QualifiedContractorsScreen extends StatelessWidget {
             const SizedBox(height: 20),
             _buildContractorRow(context, "Innovate Construction", "92%"),
             _buildContractorRow(context, "BuildRight Inc.", "89%"),
-            _buildContractorRow(
-              context,
-              "Apex Solutions",
-              "85%",
-              isInvited: true,
-            ),
+            _buildContractorRow(context, "Apex Solutions", "85%",
+                isInvited: true),
           ],
         ),
       ),
@@ -71,17 +66,11 @@ class QualifiedContractorsScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  "Overall Score: $score",
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
-                ),
+                Text(name,
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold)),
+                Text("Overall Score: $score",
+                    style: const TextStyle(color: Colors.grey, fontSize: 12)),
               ],
             ),
           ),
@@ -91,8 +80,7 @@ class QualifiedContractorsScreen extends StatelessWidget {
                   ? Colors.grey.withOpacity(0.1)
                   : const Color(0xFF3395FF),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+                  borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: isInvited
                 ? null
@@ -108,8 +96,7 @@ class QualifiedContractorsScreen extends StatelessWidget {
             child: Text(
               isInvited ? "Invited" : "Invite",
               style: TextStyle(
-                color: isInvited ? Colors.white38 : Colors.white,
-              ),
+                  color: isInvited ? Colors.white38 : Colors.white),
             ),
           ),
         ],

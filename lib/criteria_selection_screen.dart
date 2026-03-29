@@ -3,9 +3,20 @@ import 'package:flutter/material.dart';
 import 'negotiation_screen.dart';
 
 class CriteriaSelectionScreen extends StatefulWidget {
-  final String contractorName; // هذا السطر الضروري لاستقبال الاسم
+  final String contractorName;
+  final String proposalId;
+  final String sessionId;
+  final String rfpId;
+  final String rfpTitle;
 
-  const CriteriaSelectionScreen({super.key, required this.contractorName});
+  const CriteriaSelectionScreen({
+    super.key,
+    required this.contractorName,
+    this.proposalId = '',
+    this.sessionId = '',
+    this.rfpId = '',
+    this.rfpTitle = '',
+  });
 
   @override
   State<CriteriaSelectionScreen> createState() =>
@@ -13,7 +24,6 @@ class CriteriaSelectionScreen extends StatefulWidget {
 }
 
 class _CriteriaSelectionScreenState extends State<CriteriaSelectionScreen> {
-  // هنا نضع قائمة الشروط
   final Map<String, bool> _criteria = {
     "Total Project Cost": true,
     "Project Deadline": false,
@@ -39,7 +49,6 @@ class _CriteriaSelectionScreenState extends State<CriteriaSelectionScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            // هنا نستخدم الاسم اللي مررناه باستخدام widget.contractorName
             Text(
               "Defining terms for: ${widget.contractorName}",
               style: const TextStyle(
@@ -80,7 +89,6 @@ class _CriteriaSelectionScreenState extends State<CriteriaSelectionScreen> {
                 }).toList(),
               ),
             ),
-            // زر البدء النهائي باللون الأزرق
             SizedBox(
               width: double.infinity,
               height: 55,
@@ -92,8 +100,7 @@ class _CriteriaSelectionScreenState extends State<CriteriaSelectionScreen> {
                   ),
                 ),
                 onPressed: () {
-                  // نجمع فقط المعايير التي تم اختيارها (التي قيمتها true)
-                  List<String> selected = _criteria.entries
+                  final selected = _criteria.entries
                       .where((e) => e.value)
                       .map((e) => e.key)
                       .toList();
@@ -104,7 +111,13 @@ class _CriteriaSelectionScreenState extends State<CriteriaSelectionScreen> {
                       builder: (context) => AINegotiationScreen(
                         contractorName: widget.contractorName,
                         selectedCriteria: selected,
-                        proposalId: "proposal_001", // 👈 أضفناه
+                        proposalId: widget.proposalId,
+                        sessionId: widget.sessionId,
+                        rfpId: widget.rfpId,
+                        rfpTitle: widget.rfpTitle.isEmpty
+                            ? widget.contractorName
+                            : widget.rfpTitle,
+                        isManager: true,
                       ),
                     ),
                   );
