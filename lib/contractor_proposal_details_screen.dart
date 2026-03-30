@@ -1,6 +1,7 @@
 // contractor_proposal_details_screen.dart
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 
 class ContractorProposalDetailsScreen extends StatefulWidget {
@@ -47,35 +48,45 @@ class _ContractorProposalDetailsScreenState
     }
   }
 
+  // ── فتح الملف عند الضغط عليه ──
+  Future<void> _openFile(String? url) async {
+    if (url == null || url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No file URL available')),
+      );
+      return;
+    }
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open file')),
+        );
+      }
+    }
+  }
+
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'accepted':
-        return Colors.green;
-      case 'rejected':
-        return Colors.red;
-      case 'negotiation':
-        return Colors.purple;
-      case 'shortlisted':
-        return Colors.blue;
-      default:
-        return Colors.orange;
+      case 'accepted':   return Colors.green;
+      case 'rejected':   return Colors.red;
+      case 'negotiation':return Colors.purple;
+      case 'shortlisted':return Colors.blue;
+      default:           return Colors.orange;
     }
   }
 
   IconData _statusIcon(String status) {
     switch (status.toLowerCase()) {
-      case 'accepted':
-        return Icons.check_circle;
-      case 'rejected':
-        return Icons.cancel;
-      case 'negotiation':
-        return Icons.handshake_outlined;
-      default:
-        return Icons.hourglass_empty;
+      case 'accepted':   return Icons.check_circle;
+      case 'rejected':   return Icons.cancel;
+      case 'negotiation':return Icons.handshake_outlined;
+      default:           return Icons.hourglass_empty;
     }
   }
 
-  // parse criteria من comments "Cost: ... | Experience: ..."
   List<Map<String, String>> get _criteriaResponses {
     final comments = widget.proposal['comments'] as String?;
     if (comments == null || comments.isEmpty) return [];
@@ -84,7 +95,7 @@ class _ContractorProposalDetailsScreenState
       final colonIdx = trimmed.indexOf(':');
       if (colonIdx == -1) return {'name': trimmed, 'value': ''};
       return {
-        'name': trimmed.substring(0, colonIdx).trim(),
+        'name' : trimmed.substring(0, colonIdx).trim(),
         'value': trimmed.substring(colonIdx + 1).trim(),
       };
     }).toList();
@@ -92,14 +103,14 @@ class _ContractorProposalDetailsScreenState
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFF0B1220);
-    const card = Color(0xFF111A2A);
-    const stroke = Color(0xFF22314A);
-    const hint = Color(0xFF7F8EA3);
+    const bg      = Color(0xFF0B1220);
+    const card    = Color(0xFF111A2A);
+    const stroke  = Color(0xFF22314A);
+    const hint    = Color(0xFF7F8EA3);
     const primary = Color(0xFF0E8BFF);
 
-    final rfp = widget.proposal['RFP'] as Map<String, dynamic>? ?? {};
-    final status = widget.proposal['status'] ?? 'Submitted';
+    final rfp      = widget.proposal['RFP'] as Map<String, dynamic>? ?? {};
+    final status   = widget.proposal['status'] ?? 'Submitted';
     final criteria = _criteriaResponses;
 
     return Scaffold(
@@ -120,7 +131,7 @@ class _ContractorProposalDetailsScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
 
-            // ── Status Banner
+            // ── Status Banner ──
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -138,9 +149,9 @@ class _ContractorProposalDetailsScreenState
                   Text(
                     'Status: $status',
                     style: TextStyle(
-                      color: _statusColor(status),
+                      color     : _statusColor(status),
                       fontWeight: FontWeight.w700,
-                      fontSize: 16,
+                      fontSize  : 16,
                     ),
                   ),
                 ],
@@ -149,68 +160,50 @@ class _ContractorProposalDetailsScreenState
 
             const SizedBox(height: 20),
 
-            // ── RFP Info
+            // ── RFP Info ──
             _buildSection('RFP Information', card, stroke, [
-              _buildRow(Icons.title, 'Project', rfp['title'] ?? '—', hint),
-              _buildRow(
-                Icons.calendar_today,
-                'Deadline',
-                rfp['deadline'] ?? '—',
-                hint,
-              ),
-              _buildRow(
-                Icons.attach_money,
-                'RFP Budget',
-                rfp['budget'] != null ? '${rfp['budget']} SAR' : '—',
-                hint,
-              ),
+              _buildRow(Icons.title, 'Project',
+                  rfp['title'] ?? '—', hint),
+              _buildRow(Icons.calendar_today, 'Deadline',
+                  rfp['deadline'] ?? '—', hint),
+              _buildRow(Icons.attach_money, 'RFP Budget',
+                  rfp['budget'] != null ? '${rfp['budget']} SAR' : '—', hint),
               if (rfp['requiredTag'] != null)
-                _buildRow(
-                  Icons.label_outline,
-                  'Category',
-                  rfp['requiredTag'],
-                  hint,
-                ),
+                _buildRow(Icons.label_outline, 'Category',
+                    rfp['requiredTag'], hint),
             ]),
 
             const SizedBox(height: 16),
 
-            // ── Proposal Info
+            // ── Proposal Info ──
             _buildSection('Your Proposal', card, stroke, [
-              _buildRow(
-                Icons.monetization_on,
-                'Proposed Price',
-                '${widget.proposal['proposedPrice'] ?? '—'} SAR',
-                hint,
-              ),
-              _buildRow(
-                Icons.send,
-                'Submitted On',
-                widget.proposal['submitDate'] ??
-                    widget.proposal['submissionDate'] ??
-                    '—',
-                hint,
-              ),
+              _buildRow(Icons.monetization_on, 'Proposed Price',
+                  '${widget.proposal['proposedPrice'] ?? '—'} SAR', hint),
+              _buildRow(Icons.send, 'Submitted On',
+                  widget.proposal['submitDate'] ??
+                      widget.proposal['submissionDate'] ??
+                      '—',
+                  hint),
             ]),
 
             const SizedBox(height: 16),
 
-            // ── Cover Letter
+            // ── Cover Letter ──
             if ((widget.proposal['description'] ?? '').toString().isNotEmpty) ...[
               _sectionTitle('Cover Letter'),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: card,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: stroke),
+                  color        : card,
+                  borderRadius : BorderRadius.circular(14),
+                  border       : Border.all(color: stroke),
                 ),
                 child: Text(
                   widget.proposal['description'],
                   style: const TextStyle(
-                    color: Colors.white70,
-                    height: 1.6,
+                    color   : Colors.white70,
+                    height  : 1.6,
                     fontSize: 14,
                   ),
                 ),
@@ -218,15 +211,15 @@ class _ContractorProposalDetailsScreenState
               const SizedBox(height: 16),
             ],
 
-            // ── Criteria Responses
+            // ── Criteria Responses ──
             if (criteria.isNotEmpty) ...[
               _sectionTitle('Evaluation Criteria — Your Responses'),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: card,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: stroke),
+                  color        : card,
+                  borderRadius : BorderRadius.circular(14),
+                  border       : Border.all(color: stroke),
                 ),
                 child: Column(
                   children: criteria.map((c) {
@@ -237,21 +230,18 @@ class _ContractorProposalDetailsScreenState
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
+                                horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: primary.withOpacity(0.12),
+                              color : primary.withOpacity(0.12),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: primary.withOpacity(0.3),
-                              ),
+                                  color: primary.withOpacity(0.3)),
                             ),
                             child: Text(
                               c['name'] ?? '',
                               style: const TextStyle(
-                                color: primary,
-                                fontSize: 12,
+                                color     : primary,
+                                fontSize  : 12,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -260,9 +250,9 @@ class _ContractorProposalDetailsScreenState
                           Text(
                             c['value'] ?? '—',
                             style: const TextStyle(
-                              color: Colors.white70,
+                              color   : Colors.white70,
                               fontSize: 13,
-                              height: 1.5,
+                              height  : 1.5,
                             ),
                           ),
                         ],
@@ -274,7 +264,7 @@ class _ContractorProposalDetailsScreenState
               const SizedBox(height: 16),
             ],
 
-            // ── Attachments
+            // ── Attachments ──
             _sectionTitle('Attachments'),
             _loadingDocs
                 ? const Center(
@@ -287,55 +277,57 @@ class _ContractorProposalDetailsScreenState
                 ? Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: card,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: stroke),
+                      color        : card,
+                      borderRadius : BorderRadius.circular(14),
+                      border       : Border.all(color: stroke),
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.attachment, color: Colors.white24, size: 18),
+                        Icon(Icons.attachment,
+                            color: Colors.white24, size: 18),
                         SizedBox(width: 10),
-                        Text(
-                          'No attachments uploaded',
-                          style: TextStyle(color: Colors.white38, fontSize: 13),
-                        ),
+                        Text('No attachments uploaded',
+                            style: TextStyle(
+                                color: Colors.white38, fontSize: 13)),
                       ],
                     ),
                   )
                 : Column(
                     children: _attachments.map((doc) {
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: card,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: stroke),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.description_outlined,
-                              color: primary,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                doc['fullName'] ?? 'File',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13,
+                      final fileUrl = doc['fileURL'] as String?;
+                      return GestureDetector(
+                        // ← الضغط على الملف يفتحه مباشرة
+                        onTap: () => _openFile(fileUrl),
+                        child: Container(
+                          margin : const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color        : card,
+                            borderRadius : BorderRadius.circular(12),
+                            border       : Border.all(color: stroke),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.description_outlined,
+                                  color: primary, size: 20),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  doc['fullName'] ?? 'File',
+                                  style: const TextStyle(
+                                    color          : Colors.white,
+                                    fontSize       : 13,
+                                    decoration     : TextDecoration.underline,
+                                    decorationColor: Colors.white38,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                            const Icon(
-                              Icons.download_outlined,
-                              color: Colors.white38,
-                              size: 18,
-                            ),
-                          ],
+                              // أيقونة تدل على إمكانية الفتح
+                              const Icon(Icons.open_in_new_rounded,
+                                  color: primary, size: 16),
+                            ],
+                          ),
                         ),
                       );
                     }).toList(),
@@ -361,9 +353,9 @@ class _ContractorProposalDetailsScreenState
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: card,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: stroke),
+              color        : card,
+              borderRadius : BorderRadius.circular(14),
+              border       : Border.all(color: stroke),
             ),
             child: Column(children: rows),
           ),
@@ -371,18 +363,19 @@ class _ContractorProposalDetailsScreenState
       );
 
   Widget _sectionTitle(String title) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: Text(
-      title,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 15,
-        fontWeight: FontWeight.w700,
-      ),
-    ),
-  );
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Text(
+          title,
+          style: const TextStyle(
+            color     : Colors.white,
+            fontSize  : 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
 
-  Widget _buildRow(IconData icon, String label, String value, Color hint) =>
+  Widget _buildRow(
+          IconData icon, String label, String value, Color hint) =>
       Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
@@ -395,9 +388,9 @@ class _ContractorProposalDetailsScreenState
               child: Text(
                 value,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color     : Colors.white,
                   fontWeight: FontWeight.w600,
-                  fontSize: 13,
+                  fontSize  : 13,
                 ),
                 textAlign: TextAlign.end,
               ),

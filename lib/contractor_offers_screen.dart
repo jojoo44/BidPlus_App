@@ -1,3 +1,4 @@
+// contractor_offers_screen.dart
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'contractor_proposal_details_screen.dart';
@@ -20,7 +21,6 @@ class _ContractorOffersScreenState extends State<ContractorOffersScreen> {
     _loadProposals();
   }
 
-  // جيب الـ proposals الخاصة بالكونتراكتور + بيانات الـ RFP
   Future<void> _loadProposals() async {
     try {
       final userId = supabase.auth.currentUser?.id;
@@ -138,9 +138,9 @@ class _ProposalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const card = Color(0xFF111A2A);
+    const card   = Color(0xFF111A2A);
     const stroke = Color(0xFF22314A);
-    const hint = Color(0xFF7F8EA3);
+    const hint   = Color(0xFF7F8EA3);
     const primary = Color(0xFF0E8BFF);
 
     return Container(
@@ -153,24 +153,20 @@ class _ProposalCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // العنوان + الـ status
           Row(
             children: [
               Expanded(
                 child: Text(
                   rfpTitle,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color     : Colors.white,
                     fontWeight: FontWeight.w800,
-                    fontSize: 16,
+                    fontSize  : 16,
                   ),
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: _statusColor().withOpacity(0.15),
                   borderRadius: BorderRadius.circular(20),
@@ -178,8 +174,8 @@ class _ProposalCard extends StatelessWidget {
                 child: Text(
                   status,
                   style: TextStyle(
-                    color: _statusColor(),
-                    fontSize: 12,
+                    color     : _statusColor(),
+                    fontSize  : 12,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -200,7 +196,7 @@ class _ProposalCard extends StatelessWidget {
             child: OutlinedButton(
               onPressed: onViewDetails,
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: primary),
+                side          : const BorderSide(color: primary),
                 foregroundColor: primary,
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 shape: RoundedRectangleBorder(
@@ -224,9 +220,9 @@ class _ProposalCard extends StatelessWidget {
         child: Text(
           text,
           style: TextStyle(
-            color: hint,
+            color     : hint,
             fontWeight: FontWeight.w600,
-            fontSize: 13,
+            fontSize  : 13,
           ),
         ),
       ),
