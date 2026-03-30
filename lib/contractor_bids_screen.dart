@@ -100,6 +100,10 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
   List<Map<String, dynamic>> get _filtered {
     final q = _searchCtrl.text.trim().toLowerCase();
     return _openRFPs.where((rfp) {
+      final rfpId = rfp['rfpID'].toString();
+      // فقط الـ RFPs اللي ما قدّم عليها الكونتراكتور بعد
+      if (_proposalStatus(rfpId) != null) return false;
+
       final title = (rfp['title'] ?? '').toString().toLowerCase();
       final tag = (rfp['requiredTag'] ?? '').toString().toLowerCase();
       final budget = (rfp['budget'] as num?)?.toDouble() ?? 0;
@@ -177,7 +181,7 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
   void _onTapRFP(Map<String, dynamic> rfp) {
     final rfpId = rfp['rfpID'].toString();
     final pStatus = _proposalStatus(rfpId);
-    final sc = _statusColor(pStatus);
+    final _accent = _statusColor(pStatus);
 
     showModalBottomSheet(
       context: context,
@@ -203,15 +207,15 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: sc.withOpacity(0.15),
+                  color: _accent.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: sc.withOpacity(0.4)),
+                  border: Border.all(color: _accent.withOpacity(0.4)),
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(_statusIcon(pStatus), color: sc, size: 14),
+                  Icon(_statusIcon(pStatus), color: _accent, size: 14),
                   const SizedBox(width: 5),
                   Text(_statusLabel(pStatus),
-                      style: TextStyle(color: sc, fontSize: 12, fontWeight: FontWeight.w800)),
+                      style: TextStyle(color: _accent, fontSize: 12, fontWeight: FontWeight.w800)),
                 ]),
               ),
             ]),
@@ -255,14 +259,14 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: sc.withOpacity(0.08), borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: sc.withOpacity(0.3)),
+                  color: _accent.withOpacity(0.08), borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: _accent.withOpacity(0.3)),
                 ),
                 child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Icon(_statusIcon(pStatus), color: sc, size: 18),
+                  Icon(_statusIcon(pStatus), color: _accent, size: 18),
                   const SizedBox(width: 8),
                   Text('Proposal ${_statusLabel(pStatus)}',
-                      style: TextStyle(color: sc, fontWeight: FontWeight.w700, fontSize: 14)),
+                      style: TextStyle(color: _accent, fontWeight: FontWeight.w700, fontSize: 14)),
                 ]),
               ),
           ],
@@ -370,15 +374,6 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
 
                     const SizedBox(height: 12),
 
-                    // Summary
-                    _SummaryCard(
-                      card: _card, line: _line, accent: _accent, muted: _muted,
-                      total: list.length, openCount: _openCount,
-                      submittedCount: _submittedCount, acceptedCount: _acceptedCount,
-                    ),
-
-                    const SizedBox(height: 16),
-
                     // Tag chips
                     SizedBox(
                       height: 36,
@@ -427,9 +422,7 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
                     else
                       ...list.map((rfp) {
                         final rfpId = rfp['rfpID'].toString();
-                        final pStatus = _proposalStatus(rfpId);
-                        final sc = _statusColor(pStatus);
-                        final overdue = _isOverdue(rfp['deadline']) && pStatus == null;
+                        final overdue = _isOverdue(rfp['deadline']);
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -442,18 +435,18 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
                             child: InkWell(
                               onTap: () => _onTapRFP(rfp),
                               borderRadius: BorderRadius.circular(18),
-                              splashColor: sc.withOpacity(0.08),
+                              splashColor: _accent.withOpacity(0.08),
                               child: Padding(
                                 padding: const EdgeInsets.all(14),
                                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                   Container(
                                     width: 42, height: 42,
                                     decoration: BoxDecoration(
-                                      color: sc.withOpacity(0.1),
+                                      color: _accent.withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(color: sc.withOpacity(0.25)),
+                                      border: Border.all(color: _accent.withOpacity(0.25)),
                                     ),
-                                    child: Icon(_statusIcon(pStatus), color: sc, size: 20),
+                                    child: Icon(Icons.work_outline, color: _accent, size: 20),
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(child: Column(
@@ -476,20 +469,7 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
                                     ],
                                   )),
                                   const SizedBox(width: 8),
-                                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                      decoration: BoxDecoration(
-                                        color: sc.withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(999),
-                                        border: Border.all(color: sc.withOpacity(0.3)),
-                                      ),
-                                      child: Text(_statusLabel(pStatus), style: TextStyle(
-                                        color: sc, fontSize: 11, fontWeight: FontWeight.w800)),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Icon(Icons.chevron_right_rounded, color: _muted, size: 20),
-                                  ]),
+                                  Icon(Icons.chevron_right_rounded, color: _muted, size: 20),
                                 ]),
                               ),
                             ),

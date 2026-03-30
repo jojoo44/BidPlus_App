@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'contractor_offers_screen.dart';
 import 'contractor_bids_screen.dart';
-import 'contractor_tasks_screen.dart';
+import 'contractor_profile_screen.dart';
 import 'contractor_notifications_screen.dart';
 import 'contractor_negotiation_screen.dart';
 import 'contractor_negotiation_archive_screen.dart';
@@ -205,7 +205,7 @@ class _ContractorDashboardScreenState
           ? const ContractorOffersScreen()
           : _selectedIndex == 2
           ? const ContractorBidsScreen()
-          : const ContractorTasksScreen(),
+          : const ContractorProfileScreen(),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: const Color(0xFF0F1F3A),
         type: BottomNavigationBarType.fixed,
@@ -221,7 +221,7 @@ class _ContractorDashboardScreenState
           BottomNavigationBarItem(
               icon: Icon(Icons.gavel_outlined), label: 'Bids'),
           BottomNavigationBarItem(
-              icon: Icon(Icons.task_outlined), label: 'Tasks'),
+              icon: Icon(Icons.person_outline), label: 'Profile'),
         ],
       ),
     );
