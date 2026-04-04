@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+// contractor_profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
