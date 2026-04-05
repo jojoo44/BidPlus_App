@@ -9,7 +9,7 @@ import 'login_screen.dart';
 import '../main.dart';
 
 class ContractorProfileScreen extends StatefulWidget {
-  final String? contractorId; // إذا فتحه المنجر يمرر الـ ID
+  final String? contractorId;
   const ContractorProfileScreen({super.key, this.contractorId});
 
   @override
@@ -26,17 +26,16 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
   String  _email          = '';
   String  _specialization = '';
   String  _tag            = '';
+  String  _bio            = '';
   String? _photoUrl;
-  double  _avgQuality     = 0;
-  double  _avgTimeliness  = 0;
-  double  _avgOverall     = 0;
-  int     _reviewCount    = 0;
 
   List<Map<String, dynamic>> _reviews   = [];
   List<Map<String, dynamic>> _portfolio = [];
-  bool _isLoading    = true;
-  bool _isUploading  = false;
-  bool _isOwner      = false; // هل هو صاحب الحساب
+  bool _isLoading   = true;
+  bool _isUploading = false;
+  bool _isOwner     = false;
+  bool _editingBio  = false;
+  late TextEditingController _bioCtrl;
 
   String get _targetId =>
       widget.contractorId ?? supabase.auth.currentUser?.id ?? '';
@@ -45,37 +44,31 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
   void initState() {
     super.initState();
     _isOwner = widget.contractorId == null;
+    _bioCtrl = TextEditingController();
     _loadAll();
+  }
+
+  @override
+  void dispose() {
+    _bioCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadAll() async {
     setState(() => _isLoading = true);
     try {
-      // بيانات المستخدم
       final data = await supabase
           .from('User')
-          .select('username, email, specialization, specializationTag, photoUrl')
+          .select('username, email, specialization, specializationTag, photoUrl, bio')
           .eq('id', _targetId)
           .single();
 
-      // التقييمات
       final reviews = await supabase
           .from('ContractorEvaluation')
           .select()
           .eq('contractorId', _targetId)
           .order('created_at', ascending: false);
 
-      double avgQ = 0, avgT = 0, avgO = 0;
-      if ((reviews as List).isNotEmpty) {
-        avgQ = reviews.map((r) => (r['quality'] as num?)?.toDouble() ?? 0)
-            .reduce((a, b) => a + b) / reviews.length;
-        avgT = reviews.map((r) => (r['timeliness'] as num?)?.toDouble() ?? 0)
-            .reduce((a, b) => a + b) / reviews.length;
-        avgO = reviews.map((r) => (r['overallScore'] as num?)?.toDouble() ?? 0)
-            .reduce((a, b) => a + b) / reviews.length;
-      }
-
-      // البورتفوليو
       final portfolio = await supabase
           .from('ContractorPortfolio')
           .select()
@@ -87,17 +80,29 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
         _email          = data['email'] ?? '';
         _specialization = data['specialization'] ?? '';
         _tag            = data['specializationTag'] ?? '';
+        _bio            = data['bio'] ?? '';
         _photoUrl       = data['photoUrl'];
-        _avgQuality     = avgQ;
-        _avgTimeliness  = avgT;
-        _avgOverall     = avgO;
-        _reviewCount    = (reviews as List).length;
         _reviews        = List<Map<String, dynamic>>.from(reviews);
         _portfolio      = List<Map<String, dynamic>>.from(portfolio);
+        _bioCtrl.text   = _bio;
         _isLoading      = false;
       });
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _saveBio() async {
+    try {
+      await supabase.from('User')
+          .update({'bio': _bioCtrl.text.trim()}).eq('id', _targetId);
+      setState(() {
+        _bio = _bioCtrl.text.trim();
+        _editingBio = false;
+      });
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')));
     }
   }
 
@@ -128,10 +133,9 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
 
       final url = supabase.storage.from('profiles').getPublicUrl(path);
 
-      // اسأل عن عنوان
-      String title = file.name;
+      String title = file.name.split('.').first;
       if (mounted) {
-        final ctrl = TextEditingController(text: file.name.split('.').first);
+        final ctrl = TextEditingController(text: title);
         await showDialog(context: context, builder: (ctx) => AlertDialog(
           backgroundColor: surface,
           title: const Text('Add Title', style: TextStyle(color: Colors.white)),
@@ -219,9 +223,9 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.fromLTRB(20, 30, 20, 24),
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       color: surface,
-                      borderRadius: const BorderRadius.only(
+                      borderRadius: BorderRadius.only(
                         bottomLeft: Radius.circular(24),
                         bottomRight: Radius.circular(24),
                       ),
@@ -291,6 +295,69 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
 
+                      // ── About Me
+                      Row(children: [
+                        _sectionTitle('About Me'),
+                        const Spacer(),
+                        if (_isOwner)
+                          GestureDetector(
+                            onTap: () {
+                              if (_editingBio) {
+                                _saveBio();
+                              } else {
+                                setState(() => _editingBio = true);
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: blue.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(_editingBio ? 'Save' : 'Edit',
+                                  style: const TextStyle(
+                                      color: blue, fontSize: 12)),
+                            ),
+                          ),
+                      ]),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(color: surface,
+                            borderRadius: BorderRadius.circular(14)),
+                        child: _editingBio
+                            ? TextField(
+                                controller: _bioCtrl,
+                                maxLines: 5,
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: 'Tell managers about yourself, your experience and skills...',
+                                  hintStyle: TextStyle(
+                                      color: Colors.white.withOpacity(0.3),
+                                      fontSize: 13),
+                                  border: InputBorder.none,
+                                ),
+                              )
+                            : _bio.isEmpty
+                                ? Text(
+                                    _isOwner
+                                        ? 'Tap Edit to add a bio...'
+                                        : 'No bio yet.',
+                                    style: TextStyle(
+                                        color: Colors.white.withOpacity(0.3),
+                                        fontSize: 13,
+                                        fontStyle: FontStyle.italic))
+                                : Text(_bio,
+                                    style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 13,
+                                        height: 1.6)),
+                      ),
+
+                      const SizedBox(height: 24),
+
                       // ── Reviews
                       _sectionTitle(_reviews.isEmpty
                           ? 'Reviews'
@@ -349,6 +416,7 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                           ? Container(
                               width: double.infinity,
                               padding: const EdgeInsets.all(24),
+                              margin: const EdgeInsets.only(bottom: 20),
                               decoration: BoxDecoration(color: surface,
                                   borderRadius: BorderRadius.circular(16)),
                               child: Column(children: [
@@ -365,10 +433,10 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                               physics: const NeverScrollableScrollPhysics(),
                               gridDelegate:
                                   const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                crossAxisSpacing: 12,
-                                mainAxisSpacing: 12,
-                                childAspectRatio: 0.85,
+                                crossAxisCount: 3,
+                                crossAxisSpacing: 8,
+                                mainAxisSpacing: 8,
+                                childAspectRatio: 1.0,
                               ),
                               itemCount: _portfolio.length,
                               itemBuilder: (_, i) =>
@@ -377,7 +445,7 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
 
                       const SizedBox(height: 24),
 
-                      // ── Account actions (للكونتراكتور نفسه فقط)
+                      // ── Account actions
                       if (_isOwner) ...[
                         _buildItem(Icons.lock_outline, 'Change Password',
                             () => Navigator.push(context, MaterialPageRoute(
@@ -418,23 +486,6 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
         fontSize: 16, fontWeight: FontWeight.bold)),
   );
 
-  Widget _ratingBar(String label, double value, Color color) => Row(children: [
-    SizedBox(width: 70,
-        child: Text(label, style: const TextStyle(
-            color: Colors.grey, fontSize: 12))),
-    Expanded(child: ClipRRect(
-      borderRadius: BorderRadius.circular(4),
-      child: LinearProgressIndicator(
-        value: value / 5,
-        backgroundColor: Colors.white10,
-        color: color, minHeight: 6,
-      ),
-    )),
-    const SizedBox(width: 8),
-    Text(value.toStringAsFixed(1),
-        style: const TextStyle(color: Colors.white70, fontSize: 12)),
-  ]);
-
   Widget _buildReviewCard(Map<String, dynamic> r) {
     final comment = r['comment']?.toString() ?? '';
     if (comment.isEmpty) return const SizedBox.shrink();
@@ -457,56 +508,49 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
     );
   }
 
-  Widget _miniRating(String label, double val) => Row(children: [
-    Text('$label: ', style: const TextStyle(color: Colors.grey, fontSize: 11)),
-    ...List.generate(5, (i) => Icon(
-        i < val.round() ? Icons.star : Icons.star_border,
-        color: Colors.amber, size: 11)),
-  ]);
-
   Widget _buildPortfolioCard(Map<String, dynamic> item) {
     final isImage = item['fileType'] == 'image';
     return Stack(children: [
       Container(
         decoration: BoxDecoration(
-          color: surface, borderRadius: BorderRadius.circular(14)),
+          color: surface, borderRadius: BorderRadius.circular(12)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(
             child: ClipRRect(
               borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(14)),
+                  top: Radius.circular(12)),
               child: isImage
                   ? Image.network(item['fileUrl'] ?? '',
                       width: double.infinity, fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
                         color: const Color(0xFF1A2C47),
                         child: const Icon(Icons.broken_image,
-                            color: Colors.grey, size: 40)))
+                            color: Colors.grey, size: 30)))
                   : Container(color: const Color(0xFF1A2C47),
                       child: const Center(child: Icon(
                           Icons.picture_as_pdf,
-                          color: Colors.red, size: 48))),
+                          color: Colors.red, size: 36))),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(6),
             child: Text(item['title'] ?? '—',
                 style: const TextStyle(color: Colors.white,
-                    fontSize: 13, fontWeight: FontWeight.w600),
+                    fontSize: 11, fontWeight: FontWeight.w600),
                 maxLines: 1, overflow: TextOverflow.ellipsis),
           ),
         ]),
       ),
       if (_isOwner)
-        Positioned(top: 6, right: 6,
+        Positioned(top: 4, right: 4,
           child: GestureDetector(
             onTap: () => _deletePortfolioItem(item['portfolioID']),
             child: Container(
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
                   color: Colors.black54,
-                  borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.close, color: Colors.white, size: 14),
+                  borderRadius: BorderRadius.circular(6)),
+              child: const Icon(Icons.close, color: Colors.white, size: 12),
             ),
           )),
     ]);
