@@ -5,7 +5,6 @@ import 'review_publish_screen.dart';
 import '../main.dart';
 
 class RFPDetailsScreen extends StatefulWidget {
-  // استقبل الـ rfpId من الداشبورد
   final String rfpId;
   const RFPDetailsScreen({super.key, required this.rfpId});
 
@@ -28,9 +27,6 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
     _loadRFP();
   }
 
-  // ============================================
-  // جيب بيانات الـ RFP من Supabase
-  // ============================================
   Future<void> _loadRFP() async {
     try {
       final data = await supabase
@@ -53,9 +49,6 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
     }
   }
 
-  // ============================================
-  // حذف / إلغاء الـ RFP → يغيّر status لـ Cancelled
-  // ============================================
   Future<void> _cancelRFP() async {
     setState(() => _isDeleting = true);
     try {
@@ -65,7 +58,7 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
           .eq('rfpID', widget.rfpId);
 
       if (mounted) {
-        Navigator.pop(context); // ارجع للداشبورد
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('RFP has been cancelled.')),
         );
@@ -78,9 +71,6 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
     }
   }
 
-  // ============================================
-  // Dialog تأكيد الإلغاء
-  // ============================================
   void _showCancelDialog() {
     showDialog(
       context: context,
@@ -163,9 +153,6 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
     );
   }
 
-  // ============================================
-  // UI
-  // ============================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -197,7 +184,6 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // بطاقة العنوان والحالة
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
@@ -248,8 +234,6 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
                   ],
 
                   const SizedBox(height: 40),
-
-                  // الأزرار — تتغير حسب الـ status
                   _buildActionButtons(),
                   const SizedBox(height: 20),
                 ],
@@ -258,13 +242,9 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
     );
   }
 
-  // ============================================
-  // الأزرار تتغير حسب الـ status
-  // ============================================
   Widget _buildActionButtons() {
     final status = _rfp!['status'];
 
-    // لو منشور → ما في Edit أو Publish
     if (status == 'Published') {
       return Container(
         width: double.infinity,
@@ -291,10 +271,8 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
       );
     }
 
-    // لو Draft → إظهار أزرار Edit & Publish
     return Row(
       children: [
-        // زر الإلغاء
         _buildActionButton(
           Icons.delete_outline,
           Colors.red,
@@ -304,7 +282,6 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
         ),
         const SizedBox(width: 12),
 
-        // زر التعديل
         Expanded(
           child: _buildActionButton(
             null,
@@ -316,18 +293,23 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (_) => CreateRFPScreen(
+                    // ✅ نمرر كل البيانات
                     initialTitle: _rfp!['title'],
                     initialBudget: _rfp!['budget']?.toString(),
+                    initialDescription: _rfp!['description'],
+                    initialDeadline: _rfp!['deadline'],
+                    initialEvaluationCriteria: _rfp!['evaluationCriteria'],
+                    initialRequiredTag: _rfp!['requiredTag'],
+                    rfpId: widget.rfpId, // ✅ عشان يعرف يعدّل مو يضيف جديد
                   ),
                 ),
               );
-              _loadRFP(); // حدّث البيانات بعد التعديل
+              _loadRFP();
             },
           ),
         ),
         const SizedBox(width: 12),
 
-        // زر النشر → يفتح Review & Publish
         Expanded(
           child: _buildActionButton(
             null,
@@ -342,7 +324,7 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
                   builder: (_) => ReviewPublishScreen(rfpId: widget.rfpId),
                 ),
               );
-              _loadRFP(); // حدّث البيانات بعد الرجوع
+              _loadRFP();
             },
           ),
         ),
@@ -350,9 +332,6 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
     );
   }
 
-  // ============================================
-  // Widgets مساعدة
-  // ============================================
   Widget _buildStatusBadge(String? status) {
     Color color;
     switch (status) {
