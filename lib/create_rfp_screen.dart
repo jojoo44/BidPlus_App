@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
 import '../main.dart';
+import 'ahp_calculator.dart';
+import 'ahp_dialog.dart';
 
 class CreateRFPScreen extends StatefulWidget {
   final String? initialTitle;
   final String? initialBudget;
-  final String? initialDescription; // ✅ جديد
-  final String? initialDeadline; // ✅ جديد
-  final String? initialEvaluationCriteria; // ✅ جديد
-  final String? initialRequiredTag; // ✅ جديد
-  final String? rfpId; // ✅ جديد — لو موجود = edit mode
+  final String? initialDescription;
+  final String? initialDeadline;
+  final String? initialEvaluationCriteria;
+  final String? initialRequiredTag;
+  final String? rfpId;
 
   const CreateRFPScreen({
     super.key,
@@ -31,6 +33,7 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
   final Color bgColor = const Color(0xFF0D1219);
   final Color fieldColor = const Color(0xFF1C242F);
   final Color primaryBlue = const Color(0xFF3395FF);
+  final Color greenColor = const Color(0xFF34D399);
 
   late TextEditingController titleController;
   late TextEditingController budgetController;
@@ -54,6 +57,10 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
 
   List<Map<String, String>> criteriaList = [];
   List<TextEditingController> weightControllers = [];
+
+  // ── AHP: هل تم حساب الأوزان؟ ──
+  bool _ahpApplied = false;
+  double? _lastCR;
 
   final List<Map<String, String>> _tags = [
     {"label": "Construction", "value": "construction"},
@@ -81,8 +88,6 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
     );
     _selectedRequiredTag = widget.initialRequiredTag;
 
-    // ── parse evaluation criteria من النص المحفوظ ──
-    // الصيغة: "Cost:40%, Experience:60%"
     if (widget.initialEvaluationCriteria != null &&
         widget.initialEvaluationCriteria!.isNotEmpty) {
       final parts = widget.initialEvaluationCriteria!.split(',');
@@ -100,7 +105,6 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
       }
     }
 
-    // لو ما في criteria → ضع القيم الافتراضية
     if (criteriaList.isEmpty) {
       criteriaList = [
         {'name': 'Cost', 'weight': '40'},
@@ -122,6 +126,46 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
     _requiredSpecController.dispose();
     for (var c in weightControllers) c.dispose();
     super.dispose();
+  }
+
+  // ── فتح AHP Dialog ──
+  Future<void> _openAHPDialog() async {
+    if (criteriaList.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Add at least two criteria first')),
+      );
+      return;
+    }
+
+    final names = criteriaList.map((c) => c['name']!).toList();
+
+    final result = await showDialog<Map<String, double>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AHPDialog(criteria: names),
+    );
+
+    if (result == null) return; // المستخدم أغلق بدون تأكيد
+
+    // طبّق الأوزان على الـ controllers
+    final percents = AHPCalculator.weightsToPercent(result.values.toList());
+    setState(() {
+      for (int i = 0; i < criteriaList.length; i++) {
+        final name = criteriaList[i]['name']!;
+        if (result.containsKey(name)) {
+          weightControllers[i].text = percents[i].toString();
+          criteriaList[i]['weight'] = percents[i].toString();
+        }
+      }
+      _ahpApplied = true;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('✓ Weights applied successfully'),
+        backgroundColor: greenColor,
+      ),
+    );
   }
 
   Future<void> _pickDate() async {
@@ -243,9 +287,7 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
       };
 
       if (_isEditMode) {
-        // ── Edit mode → update ──
         await supabase.from('RFP').update(payload).eq('rfpID', widget.rfpId!);
-
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -256,7 +298,6 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
           Navigator.pop(context);
         }
       } else {
-        // ── Create mode → insert ──
         final newRfp = await supabase
             .from('RFP')
             .insert({
@@ -313,7 +354,7 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          _isEditMode ? 'Edit RFP' : 'New RFP', // ✅ العنوان يتغير
+          _isEditMode ? 'Edit RFP' : 'New RFP',
           style: const TextStyle(color: Colors.white, fontSize: 18),
         ),
         centerTitle: true,
@@ -397,7 +438,70 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
             ),
 
             const SizedBox(height: 20),
-            _buildLabel('Evaluation Criteria'),
+
+            // ── Evaluation Criteria Header ──
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildLabel('Evaluation Criteria'),
+                // ── زر AHP ──
+                GestureDetector(
+                  onTap: _openAHPDialog,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _ahpApplied
+                          ? greenColor.withOpacity(0.15)
+                          : primaryBlue.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: _ahpApplied
+                            ? greenColor.withOpacity(0.5)
+                            : primaryBlue.withOpacity(0.5),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _ahpApplied
+                              ? Icons.check_circle_outline
+                              : Icons.auto_fix_high,
+                          color: _ahpApplied ? greenColor : primaryBlue,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          _ahpApplied ? 'AHP ✓' : 'Set weights with AHP',
+                          style: TextStyle(
+                            color: _ahpApplied ? greenColor : primaryBlue,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            // إشعار لو AHP مطبق
+            if (_ahpApplied)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Weights set by AHP — you can still adjust them manually',
+                  style: TextStyle(
+                    color: greenColor.withOpacity(0.7),
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+
             ...criteriaList.asMap().entries.map((entry) {
               int idx = entry.key;
               return Padding(
@@ -422,6 +526,7 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
                         setState(() {
                           criteriaList.removeAt(idx);
                           weightControllers.removeAt(idx);
+                          if (_ahpApplied) _ahpApplied = false;
                         });
                       },
                     ),
@@ -434,6 +539,7 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
               onTap: () => setState(() {
                 criteriaList.add({'name': 'Cost', 'weight': '0'});
                 weightControllers.add(TextEditingController(text: '0'));
+                if (_ahpApplied) _ahpApplied = false;
               }),
               child: _buildDashedButton('+ Add Criterion'),
             ),
@@ -503,7 +609,7 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
                 child: _isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
                     : Text(
-                        _isEditMode ? 'Save Changes' : 'Create RFP', // ✅
+                        _isEditMode ? 'Save Changes' : 'Create RFP',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
