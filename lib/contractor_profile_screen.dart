@@ -1,6 +1,7 @@
 // contractor_profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'contractor_edit_account_screen.dart';
 import 'change_password_screen.dart';
@@ -510,36 +511,47 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
 
   Widget _buildPortfolioCard(Map<String, dynamic> item) {
     final isImage = item['fileType'] == 'image';
+    final fileUrl = item['fileUrl'] ?? '';
+
     return Stack(children: [
-      Container(
-        decoration: BoxDecoration(
-          color: surface, borderRadius: BorderRadius.circular(12)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Expanded(
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(12)),
-              child: isImage
-                  ? Image.network(item['fileUrl'] ?? '',
-                      width: double.infinity, fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+      GestureDetector(
+        onTap: () async {
+          final uri = Uri.tryParse(fileUrl);
+          if (uri != null && await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: surface, borderRadius: BorderRadius.circular(12)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(12)),
+                child: isImage
+                    ? Image.network(fileUrl,
+                        width: double.infinity, fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: const Color(0xFF1A2C47),
+                          child: const Icon(Icons.broken_image,
+                              color: Colors.grey, size: 30)))
+                    : Container(
                         color: const Color(0xFF1A2C47),
-                        child: const Icon(Icons.broken_image,
-                            color: Colors.grey, size: 30)))
-                  : Container(color: const Color(0xFF1A2C47),
-                      child: const Center(child: Icon(
-                          Icons.picture_as_pdf,
-                          color: Colors.red, size: 36))),
+                        child: const Center(child: Icon(
+                            Icons.picture_as_pdf,
+                            color: Colors.red, size: 36))),
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(6),
-            child: Text(item['title'] ?? '—',
-                style: const TextStyle(color: Colors.white,
-                    fontSize: 11, fontWeight: FontWeight.w600),
-                maxLines: 1, overflow: TextOverflow.ellipsis),
-          ),
-        ]),
+            Padding(
+              padding: const EdgeInsets.all(6),
+              child: Text(item['title'] ?? '—',
+                  style: const TextStyle(color: Colors.white,
+                      fontSize: 11, fontWeight: FontWeight.w600),
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+          ]),
+        ),
       ),
       if (_isOwner)
         Positioned(top: 4, right: 4,
