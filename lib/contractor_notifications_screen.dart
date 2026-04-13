@@ -1,5 +1,5 @@
+// contractor_notifications_screen.dart
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'contractor_negotiation_archive_screen.dart';
 import 'contractor_rfp_details_screen.dart';
 import 'contractor_proposal_details_screen.dart';

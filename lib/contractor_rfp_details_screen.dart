@@ -14,7 +14,7 @@ import 'final_total_score_screen.dart';
 import 'contractor_proposal_details_screen.dart';
 
 // ignore: avoid_web_libraries_in_flutter
-import 'dart:js' as js;
+import 'dart:js' as js;//update in ai 
 
 const String _mistralApiKey = 'MVa2RmzLbQhwrJ3M18YwrwR7uVvhyrIq';
 

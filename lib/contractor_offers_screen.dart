@@ -1,6 +1,5 @@
 // contractor_offers_screen.dart
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'contractor_proposal_details_screen.dart';
 import '../main.dart';
 
