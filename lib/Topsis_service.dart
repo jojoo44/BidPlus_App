@@ -9,6 +9,7 @@ import 'dart:math';
 /// نتيجة TOPSIS لمقاول واحد
 class TopsisResult {
   final String proposalId;
+  final String contractorId; // submitterUserId (uuid)
   final String contractorName;
   final double ciScore; // Closeness Index (0→1)
   final double ciPercent; // ciScore × 100
@@ -17,6 +18,7 @@ class TopsisResult {
 
   const TopsisResult({
     required this.proposalId,
+    required this.contractorId,
     required this.contractorName,
     required this.ciScore,
     required this.ciPercent,
@@ -189,6 +191,7 @@ class TopsisService {
       results.add(
         TopsisResult(
           proposalId: withScores[i]['ProposalID']?.toString() ?? '',
+          contractorId: withScores[i]['submitterUserId']?.toString() ?? '',
           contractorName:
               withScores[i]['contractorname']?.toString() ?? 'Unknown',
           ciScore: ci,

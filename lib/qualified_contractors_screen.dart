@@ -141,7 +141,7 @@ class _QualifiedContractorsScreenState
     try {
       await supabase.from('NegoSession').insert({
         'rfp_id': widget.rfpId,
-        'contractor_id': result.proposalId, // ← proposalId يُستخدم للربط
+        'contractor_id': result.contractorId, // submitterUserId (uuid)
         'status': 'Invited',
         'start_date': DateTime.now().toIso8601String(),
       });
