@@ -31,7 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
  
- 
+  http: ^1.2.0 
   supabase_flutter: ^2.3.0
 
   file_picker: ^10.3.10
