@@ -2,19 +2,15 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import 'final_total_score_screen.dart';
 import 'contractor_proposal_details_screen.dart';
 
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:js' as js;
 
 const String _mistralApiKey = 'MVa2RmzLbQhwrJ3M18YwrwR7uVvhyrIq';
 
@@ -22,48 +18,18 @@ const String _mistralApiKey = 'MVa2RmzLbQhwrJ3M18YwrwR7uVvhyrIq';
 //  استخراج النص من PDF
 // ─────────────────────────────────────────────
 Future<String> _extractPdfText(Uint8List bytes) async {
-  if (!kIsWeb) {
-    try {
-      final raw = utf8.decode(bytes, allowMalformed: true);
-      final buffer = StringBuffer();
-      final regex = RegExp(r'\(([^)]{2,})\)');
-      for (final match in regex.allMatches(raw)) {
-        final text = match.group(1) ?? '';
-        if (text.codeUnits.every((c) => c >= 32 && c < 127)) {
-          buffer.write('$text ');
-        }
-      }
-      return buffer.toString().trim();
-    } catch (_) {
-      return '';
-    }
-  }
   try {
-    final base64Data = base64Encode(bytes);
-    final completer = Completer<String>();
-    final jsPromise = js.context.callMethod('extractPdfText', [base64Data]);
-    final jsObject = js.JsObject.fromBrowserObject(jsPromise);
-    jsObject.callMethod('then', [
-      js.allowInterop((dynamic result) {
-        if (!completer.isCompleted)
-          completer.complete(result?.toString() ?? '');
-      }),
-    ]);
-    jsObject.callMethod('catch', [
-      js.allowInterop((dynamic error) {
-        debugPrint('=== pdf.js error: $error ===');
-        if (!completer.isCompleted) completer.complete('');
-      }),
-    ]);
-    return await completer.future.timeout(
-      const Duration(seconds: 15),
-      onTimeout: () {
-        debugPrint('=== pdf.js TIMEOUT ===');
-        return '';
-      },
-    );
-  } catch (e) {
-    debugPrint('=== _extractPdfText ERROR: $e ===');
+    final raw = utf8.decode(bytes, allowMalformed: true);
+    final buffer = StringBuffer();
+    final regex = RegExp(r'\(([^)]{2,})\)');
+    for (final match in regex.allMatches(raw)) {
+      final text = match.group(1) ?? '';
+      if (text.codeUnits.every((c) => c >= 32 && c < 127)) {
+        buffer.write('$text ');
+      }
+    }
+    return buffer.toString().trim();
+  } catch (_) {
     return '';
   }
 }

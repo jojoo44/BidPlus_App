@@ -7,7 +7,7 @@ import 'criteria_selection_screen.dart';
 
 class QualifiedContractorsScreen extends StatefulWidget {
   final String? rfpId;
-  final List<TopsisResult>? topsisResults; // ← نتائج TOPSIS جاهزة
+  final List<TopsisResult>? topsisResults;
   final Map<String, double>? weights;
 
   const QualifiedContractorsScreen({
@@ -31,7 +31,7 @@ class _QualifiedContractorsScreenState
   List<TopsisResult> _results = [];
   List<TopsisResult> _filtered = [];
   bool _isLoading = true;
-  bool _showAll = false; // عرض المستبعدين أيضاً
+  bool _showAll = false;
 
   final _searchController = TextEditingController();
 
@@ -42,12 +42,10 @@ class _QualifiedContractorsScreenState
   void initState() {
     super.initState();
     if (widget.topsisResults != null && widget.topsisResults!.isNotEmpty) {
-      // استُدعيت من proposals_list بنتائج جاهزة
       _results = widget.topsisResults!;
       _filtered = _getFiltered();
       _isLoading = false;
     } else {
-      // استُدعيت مباشرة — نحتاج نحمّل ونحسب
       _loadAndAnalyze();
     }
 
@@ -70,9 +68,6 @@ class _QualifiedContractorsScreenState
   List<TopsisResult> _getFiltered() =>
       _showAll ? _results : _results.where((r) => r.isQualified).toList();
 
-  // ─────────────────────────────────────────────
-  //  Load + Analyze (لو استُدعيت مباشرة)
-  // ─────────────────────────────────────────────
   Future<void> _loadAndAnalyze() async {
     setState(() => _isLoading = true);
     try {
@@ -135,7 +130,7 @@ class _QualifiedContractorsScreenState
   }
 
   // ─────────────────────────────────────────────
-  //  Invite
+  //  Invite → يحفظ في NegoSession ثم يفتح CriteriaSelectionScreen
   // ─────────────────────────────────────────────
   Future<void> _invite(TopsisResult result) async {
     try {
@@ -149,15 +144,29 @@ class _QualifiedContractorsScreenState
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✓ ${result.contractorName} invited to negotiation'),
+            content: Text('✓ ${result.contractorName} invited'),
             backgroundColor: Colors.green,
+            duration: const Duration(seconds: 1),
+          ),
+        );
+
+        // ← الجديد: افتح CriteriaSelectionScreen بعد الـ Invite
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CriteriaSelectionScreen(
+              contractorName: result.contractorName,
+              rfpId: widget.rfpId ?? '',
+            ),
           ),
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 
@@ -264,17 +273,17 @@ class _QualifiedContractorsScreenState
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            const Row(
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.auto_awesome,
                                   color: primaryBlue,
                                   size: 16,
                                 ),
-                                const SizedBox(width: 8),
+                                SizedBox(width: 8),
                                 Text(
                                   'TOPSIS Analysis Complete',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: primaryBlue,
                                     fontSize: 13,
                                     fontWeight: FontWeight.bold,
@@ -284,7 +293,9 @@ class _QualifiedContractorsScreenState
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'Threshold: ${threshold.toInt()}%  ·  $_qualifiedCount qualified  ·  ${_totalCount - _qualifiedCount} below threshold',
+                              'Threshold: ${threshold.toInt()}%  ·  '
+                              '$_qualifiedCount qualified  ·  '
+                              '${_totalCount - _qualifiedCount} below threshold',
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.5),
                                 fontSize: 11,
@@ -296,7 +307,7 @@ class _QualifiedContractorsScreenState
 
                       const SizedBox(height: 10),
 
-                      // Toggle: Qualified only / Show all
+                      // Toggle
                       Row(
                         children: [
                           _filterChip('Qualified only', !_showAll, () {
@@ -320,7 +331,6 @@ class _QualifiedContractorsScreenState
 
                 const SizedBox(height: 8),
 
-                // List
                 Expanded(
                   child: _filtered.isEmpty
                       ? Center(
@@ -336,7 +346,8 @@ class _QualifiedContractorsScreenState
                               Text(
                                 _showAll
                                     ? 'No results'
-                                    : 'No contractors met the ${threshold.toInt()}% threshold',
+                                    : 'No contractors met the '
+                                          '${threshold.toInt()}% threshold',
                                 style: const TextStyle(
                                   color: Colors.grey,
                                   fontSize: 14,
@@ -422,7 +433,6 @@ class _QualifiedContractorsScreenState
       ),
       child: Column(
         children: [
-          // شريط علوي
           Container(
             height: 3,
             decoration: BoxDecoration(
@@ -440,7 +450,6 @@ class _QualifiedContractorsScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
                 Row(
                   children: [
                     CircleAvatar(
@@ -507,7 +516,7 @@ class _QualifiedContractorsScreenState
                         ],
                       ),
                     ),
-                    // Invite Button (مؤهلين فقط)
+                    // Invite Button — مؤهلين فقط
                     if (isQualified)
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
@@ -531,7 +540,7 @@ class _QualifiedContractorsScreenState
 
                 const SizedBox(height: 12),
 
-                // Progress Bar مع خط الـ Threshold
+                // Progress Bar
                 Stack(
                   children: [
                     ClipRRect(
@@ -547,7 +556,6 @@ class _QualifiedContractorsScreenState
                         minHeight: 8,
                       ),
                     ),
-                    // خط الـ Threshold
                     Positioned(
                       left: MediaQuery.of(context).size.width * threshold - 50,
                       top: 0,
