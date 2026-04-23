@@ -4,6 +4,7 @@ import 'profile_screen.dart';
 import 'create_rfp_screen.dart';
 import 'rfp_details_screen.dart';
 import 'proposals_list_screen.dart';
+import 'rfp_selector_screen.dart';
 import 'active_rfp_details_screen.dart';
 import 'notifications_screen.dart';
 import 'negotiation_mng_screen.dart';
@@ -208,6 +209,7 @@ class _BidPlusState extends State<BidPlus> {
                 },
               ),
               const SizedBox(height: 12),
+              // ← التغيير هنا: RFPSelectorScreen بدل ProposalsListScreen
               _buildActionButton(
                 context,
                 "View All Proposals",
@@ -215,9 +217,7 @@ class _BidPlusState extends State<BidPlus> {
                 cardColor,
                 () => Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const ProposalsListScreen(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const RFPSelectorScreen()),
                 ),
                 isOutlined: true,
               ),
