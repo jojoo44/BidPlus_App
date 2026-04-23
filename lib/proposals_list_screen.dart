@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'qualified_contractors_screen.dart';
+import 'topsis_service.dart';
 import '../main.dart';
 import 'manager_proposal_details_screen.dart';
 import 'dart:math';
@@ -17,155 +18,11 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
   List<Map<String, dynamic>> _proposals = [];
   List<Map<String, dynamic>> _filtered = [];
   bool _isLoading = true;
+  bool _isAnalyzing = false; // ← حالة زر Analyze
   bool _topsisApplied = false;
+  String? _evaluationCriteria;
+
   final _searchController = TextEditingController();
-
-  // ─────────────────────────────────────────────
-  //  TOPSIS ALGORITHM
-  // ─────────────────────────────────────────────
-
-  /// Parse evaluationCriteria من RFP
-  /// مثال: "Cost:20%, Experience:40%, Technical:40%"
-  Map<String, double> _parseWeights(String? raw) {
-    if (raw == null || raw.trim().isEmpty) return {};
-    final weights = <String, double>{};
-    for (final part in raw.split(',')) {
-      final cleaned = part.trim().replaceAll('%', '');
-      final kv = cleaned.split(':');
-      if (kv.length == 2) {
-        final name = kv[0].trim().toLowerCase();
-        final val = double.tryParse(kv[1].trim()) ?? 0;
-        weights[name] = val / 100; // 40% → 0.40
-      }
-    }
-    return weights;
-  }
-
-  /// Parse scores من comments في proposals
-  /// مثال: "Cost: 14000 | Experience: 5 | Technical: 1"
-  /// أو يرجع الـ final score لو ما في comments
-  Map<String, double> _parseCriteriaScores(Map<String, dynamic> proposal) {
-    final comments = proposal['comments']?.toString() ?? '';
-    final scores = <String, double>{};
-
-    if (comments.contains('|')) {
-      // شكل: "Cost: 14000 | Experience: 5 | Technical: 1"
-      for (final part in comments.split('|')) {
-        final kv = part.trim().split(':');
-        if (kv.length == 2) {
-          final name = kv[0].trim().toLowerCase();
-          final val = double.tryParse(kv[1].trim()) ?? 0;
-          scores[name] = val;
-        }
-      }
-    } else {
-      // fallback: استخدم الـ score الكلي
-      final finalScore = (proposal['score'] as num?)?.toDouble() ?? 0;
-      scores['score'] = finalScore;
-    }
-
-    return scores;
-  }
-
-  /// تطبيق خوارزمية TOPSIS الكاملة
-  /// ترجع list من proposals مرتبة مع topsisScore لكل واحد
-  List<Map<String, dynamic>> _applyTOPSIS(
-    List<Map<String, dynamic>> proposals,
-    Map<String, double> weights,
-  ) {
-    if (proposals.isEmpty) return proposals;
-    if (weights.isEmpty) return proposals;
-
-    final criteriaKeys = weights.keys.toList();
-    final n = proposals.length;
-    final m = criteriaKeys.length;
-
-    // ── الخطوة 1: بناء Decision Matrix ──────────
-    // matrix[i][j] = score المقاول i في المعيار j
-    final matrix = List.generate(n, (i) {
-      final scores = _parseCriteriaScores(proposals[i]);
-      return List.generate(m, (j) {
-        return scores[criteriaKeys[j]] ?? 0.0;
-      });
-    });
-
-    // ── الخطوة 2: Normalize المصفوفة ──────────
-    // normalized[i][j] = matrix[i][j] / sqrt(sum of squares in column j)
-    final normalized = List.generate(n, (_) => List.filled(m, 0.0));
-
-    for (int j = 0; j < m; j++) {
-      double sumSq = 0;
-      for (int i = 0; i < n; i++) {
-        sumSq += matrix[i][j] * matrix[i][j];
-      }
-      final norm = sqrt(sumSq);
-      for (int i = 0; i < n; i++) {
-        normalized[i][j] = norm == 0 ? 0 : matrix[i][j] / norm;
-      }
-    }
-
-    // ── الخطوة 3: Weighted Normalized Matrix ──
-    // weighted[i][j] = normalized[i][j] * weight[j]
-    final weighted = List.generate(n, (_) => List.filled(m, 0.0));
-
-    for (int i = 0; i < n; i++) {
-      for (int j = 0; j < m; j++) {
-        final w = weights[criteriaKeys[j]] ?? 0;
-        weighted[i][j] = normalized[i][j] * w;
-      }
-    }
-
-    // ── الخطوة 4: Ideal Best & Ideal Worst ────
-    // كل المعايير هنا benefit (كلها أعلى = أفضل)
-    final idealBest = List.filled(m, double.negativeInfinity);
-    final idealWorst = List.filled(m, double.infinity);
-
-    for (int j = 0; j < m; j++) {
-      for (int i = 0; i < n; i++) {
-        if (weighted[i][j] > idealBest[j]) idealBest[j] = weighted[i][j];
-        if (weighted[i][j] < idealWorst[j]) idealWorst[j] = weighted[i][j];
-      }
-    }
-
-    // ── الخطوة 5: حساب المسافة من Ideal Best & Worst ──
-    final distBest = List.filled(n, 0.0);
-    final distWorst = List.filled(n, 0.0);
-
-    for (int i = 0; i < n; i++) {
-      double sumBest = 0, sumWorst = 0;
-      for (int j = 0; j < m; j++) {
-        sumBest += pow(weighted[i][j] - idealBest[j], 2);
-        sumWorst += pow(weighted[i][j] - idealWorst[j], 2);
-      }
-      distBest[i] = sqrt(sumBest);
-      distWorst[i] = sqrt(sumWorst);
-    }
-
-    // ── الخطوة 6: TOPSIS Score ─────────────────
-    // score = distWorst / (distBest + distWorst)
-    // كلما اقترب من 1 → أفضل
-    final topsisScores = List.filled(n, 0.0);
-    for (int i = 0; i < n; i++) {
-      final denom = distBest[i] + distWorst[i];
-      topsisScores[i] = denom == 0 ? 0 : distWorst[i] / denom;
-    }
-
-    // ── الخطوة 7: رتّب proposals حسب TOPSIS Score ──
-    final indexed = List.generate(n, (i) => i);
-    indexed.sort((a, b) => topsisScores[b].compareTo(topsisScores[a]));
-
-    return indexed.map((i) {
-      return {
-        ...proposals[i],
-        'topsisScore': topsisScores[i],
-        'topsisRank': indexed.indexOf(i) + 1,
-      };
-    }).toList();
-  }
-
-  // ─────────────────────────────────────────────
-  //  LOAD DATA
-  // ─────────────────────────────────────────────
 
   @override
   void initState() {
@@ -180,6 +37,9 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
     super.dispose();
   }
 
+  // ─────────────────────────────────────────────
+  //  Load Proposals (بدون TOPSIS — الترتيب بالتاريخ)
+  // ─────────────────────────────────────────────
   Future<void> _loadProposals() async {
     setState(() => _isLoading = true);
     try {
@@ -187,17 +47,14 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
       if (userId == null) return;
 
       List<Map<String, dynamic>> proposals = [];
-      String? evaluationCriteria;
 
       if (widget.rfpId != null) {
-        // جيب الـ proposals + evaluationCriteria من RFP معاً
         final rfpData = await supabase
             .from('RFP')
             .select('evaluationCriteria')
             .eq('rfpID', widget.rfpId!)
             .maybeSingle();
-
-        evaluationCriteria = rfpData?['evaluationCriteria'];
+        _evaluationCriteria = rfpData?['evaluationCriteria'];
 
         final data = await supabase
             .from('proposals_with_username')
@@ -216,9 +73,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
           if (mounted) setState(() => _isLoading = false);
           return;
         }
-
-        // خذ الـ evaluationCriteria من أول RFP (أو يمكن تطبيقها per-RFP)
-        evaluationCriteria = rfpData.isNotEmpty
+        _evaluationCriteria = rfpData.isNotEmpty
             ? rfpData[0]['evaluationCriteria']
             : null;
 
@@ -230,38 +85,115 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
         proposals = List<Map<String, dynamic>>.from(data);
       }
 
-      // ── تطبيق TOPSIS ──────────────────────────
-      List<Map<String, dynamic>> sortedProposals = proposals;
-      bool topsisApplied = false;
-
-      final weights = _parseWeights(evaluationCriteria);
-      if (weights.isNotEmpty && proposals.isNotEmpty) {
-        // تطبّق TOPSIS فقط على proposals اللي عندها comments (scores)
-        final withScores = proposals
-            .where((p) => p['comments'] != null)
-            .toList();
-        final withoutScores = proposals
-            .where((p) => p['comments'] == null)
-            .toList();
-
-        if (withScores.length >= 2) {
-          final ranked = _applyTOPSIS(withScores, weights);
-          sortedProposals = [...ranked, ...withoutScores];
-          topsisApplied = true;
-        }
-      }
-
       if (mounted) {
         setState(() {
-          _proposals = sortedProposals;
-          _filtered = sortedProposals;
+          _proposals = proposals;
+          _filtered = proposals;
           _isLoading = false;
-          _topsisApplied = topsisApplied;
+          _topsisApplied = false;
         });
       }
     } catch (e) {
       debugPrint('Error loading proposals: $e');
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  //  Analyze & Rank — ضغطة الزر
+  // ─────────────────────────────────────────────
+  Future<void> _analyzeAndRank() async {
+    final weights = TopsisService.parseWeights(_evaluationCriteria);
+    if (weights.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No evaluation criteria found for this RFP'),
+        ),
+      );
+      return;
+    }
+
+    final withScores = _proposals
+        .where(
+          (p) =>
+              p['comments'] != null && (p['comments'] as String).contains('|'),
+        )
+        .toList();
+
+    if (withScores.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Need at least 2 proposals with AI scores to rank'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isAnalyzing = true);
+
+    try {
+      // تشغيل TOPSIS
+      final results = TopsisService.analyze(
+        proposals: withScores,
+        weights: weights,
+      );
+
+      // ادمج النتائج مع بيانات الـ proposals
+      final rankedProposals = <Map<String, dynamic>>[];
+      for (int i = 0; i < results.length; i++) {
+        final r = results[i];
+        final original = withScores.firstWhere(
+          (p) => (p['ProposalID']?.toString() ?? '') == r.proposalId,
+          orElse: () => withScores[i],
+        );
+        rankedProposals.add({
+          ...original,
+          'topsisScore': r.ciScore,
+          'topsisPercent': r.ciPercent,
+          'isQualified': r.isQualified,
+          'aiInsight': TopsisService.generateInsight(r, weights),
+        });
+      }
+
+      // proposals بدون scores تجي في الآخر
+      final withoutScores = _proposals
+          .where(
+            (p) =>
+                p['comments'] == null ||
+                !(p['comments'] as String).contains('|'),
+          )
+          .toList();
+
+      if (mounted) {
+        setState(() {
+          _proposals = [...rankedProposals, ...withoutScores];
+          _filtered = [...rankedProposals, ...withoutScores];
+          _topsisApplied = true;
+          _isAnalyzing = false;
+        });
+      }
+
+      // انتقل للـ Qualified screen
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => QualifiedContractorsScreen(
+              rfpId: widget.rfpId,
+              topsisResults: results,
+              weights: weights,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Analyze error: $e');
+      if (mounted) {
+        setState(() => _isAnalyzing = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 
@@ -277,13 +209,20 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
   }
 
   // ─────────────────────────────────────────────
-  //  UI
+  //  BUILD
   // ─────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     const bgColor = Color(0xFF0D1219);
     const cardColor = Color(0xFF1C242F);
+
+    // عدد proposals عندها AI scores
+    final scoredCount = _proposals
+        .where(
+          (p) =>
+              p['comments'] != null && (p['comments'] as String).contains('|'),
+        )
+        .length;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -296,7 +235,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          // ── بادج TOPSIS ──
           if (_topsisApplied)
             Padding(
               padding: const EdgeInsets.only(right: 12),
@@ -320,19 +258,98 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
       ),
       body: Column(
         children: [
-          // ── Search + Qualified Button ──
+          // ── Search ──
           Padding(
-            padding: const EdgeInsets.all(15),
-            child: Row(
-              children: [
-                Expanded(child: _buildSearchField()),
-                const SizedBox(width: 10),
-                _buildFilterButton(context),
-              ],
-            ),
+            padding: const EdgeInsets.fromLTRB(15, 15, 15, 10),
+            child: _buildSearchField(),
           ),
 
-          // ── Count + TOPSIS Label ──
+          // ── زر Analyze & Rank ───────────────────
+          if (!_isLoading && scoredCount >= 2)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 15),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isAnalyzing
+                        ? const Color(0xFF1C242F)
+                        : const Color(0xFF3395FF),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: _isAnalyzing ? null : _analyzeAndRank,
+                  icon: _isAnalyzing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.auto_awesome,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                  label: Text(
+                    _isAnalyzing
+                        ? 'Applying TOPSIS...'
+                        : _topsisApplied
+                        ? 'Re-Analyze & Rank'
+                        : 'Analyze & Rank  ($scoredCount proposals)',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // ── لو ما في proposals مكتملة ──
+          if (!_isLoading && scoredCount < 2 && _proposals.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 4),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      color: Colors.orange,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Need at least 2 proposals with AI scores to enable ranking.',
+                        style: TextStyle(
+                          color: Colors.orange.withOpacity(0.9),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 8),
+
+          // ── Count ──
           if (!_isLoading)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 15),
@@ -363,17 +380,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(color: Color(0xFF3395FF)),
-                        SizedBox(height: 12),
-                        Text(
-                          'Calculating TOPSIS ranking...',
-                          style: TextStyle(color: Colors.grey, fontSize: 13),
-                        ),
-                      ],
-                    ),
+                    child: CircularProgressIndicator(color: Color(0xFF3395FF)),
                   )
                 : _filtered.isEmpty
                 ? const Center(
@@ -401,15 +408,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                       itemCount: _filtered.length,
                       itemBuilder: (context, i) {
                         final p = _filtered[i];
-                        final username = p['contractorname'] ?? 'Unknown';
-                        final rfpTitle = p['RFP']?['title'] ?? '—';
-                        final price = p['proposedPrice'];
-                        final status = p['status'] ?? 'Submitted';
-                        final date = p['submitDate'] ?? '—';
-                        final desc = p['description'] ?? '';
-                        final topsisScore = (p['topsisScore'] as double?) ?? -1;
-                        final rank = i + 1;
-
                         return GestureDetector(
                           onTap: () async {
                             await Navigator.push(
@@ -424,14 +422,8 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                             _loadProposals();
                           },
                           child: _buildProposalCard(
-                            rank: rank,
-                            username: username,
-                            rfpTitle: rfpTitle,
-                            price: price?.toString() ?? '—',
-                            status: status,
-                            date: date,
-                            description: desc,
-                            topsisScore: topsisScore,
+                            rank: i + 1,
+                            proposal: p,
                             cardColor: cardColor,
                           ),
                         );
@@ -448,15 +440,13 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
   //  WIDGETS
   // ─────────────────────────────────────────────
 
-  /// لون الرتبة حسب الترتيب
   Color _rankColor(int rank) {
-    if (rank == 1) return const Color(0xFFFFD700); // Gold
-    if (rank == 2) return const Color(0xFFC0C0C0); // Silver
-    if (rank == 3) return const Color(0xFFCD7F32); // Bronze
+    if (rank == 1) return const Color(0xFFFFD700);
+    if (rank == 2) return const Color(0xFFC0C0C0);
+    if (rank == 3) return const Color(0xFFCD7F32);
     return Colors.grey;
   }
 
-  /// أيقونة الرتبة
   String _rankLabel(int rank) {
     if (rank == 1) return '🥇';
     if (rank == 2) return '🥈';
@@ -481,7 +471,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
     controller: _searchController,
     style: const TextStyle(color: Colors.white),
     decoration: InputDecoration(
-      hintText: "Search by contractor or RFP...",
+      hintText: 'Search by contractor or RFP...',
       hintStyle: const TextStyle(color: Colors.grey),
       prefixIcon: const Icon(Icons.search, color: Colors.grey),
       filled: true,
@@ -493,49 +483,44 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
     ),
   );
 
-  Widget _buildFilterButton(BuildContext context) => ElevatedButton.icon(
-    style: ElevatedButton.styleFrom(
-      backgroundColor: const Color(0xFF3395FF),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    ),
-    onPressed: () => Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const QualifiedContractorsScreen()),
-    ),
-    icon: const Icon(Icons.stars, color: Colors.white, size: 18),
-    label: const Text("Qualified", style: TextStyle(color: Colors.white)),
-  );
-
   Widget _buildProposalCard({
     required int rank,
-    required String username,
-    required String rfpTitle,
-    required String price,
-    required String status,
-    required String date,
-    required String description,
-    required double topsisScore,
+    required Map<String, dynamic> proposal,
     required Color cardColor,
   }) {
+    final username = proposal['contractorname'] ?? 'Unknown';
+    final rfpTitle = proposal['RFP']?['title'] ?? '—';
+    final price = proposal['proposedPrice'];
+    final status = proposal['status'] ?? 'Submitted';
+    final date = proposal['submitDate'] ?? '—';
+    final description = proposal['description'] ?? '';
+    final topsisScore = (proposal['topsisScore'] as double?) ?? -1;
+    final isQualified = proposal['isQualified'] as bool?;
+    final aiInsight = proposal['aiInsight'] as String?;
+
     final hasTopsis = topsisScore >= 0;
     final scorePercent = (topsisScore * 100).toStringAsFixed(1);
+
+    // لون الحدود: أخضر مؤهل، أحمر غير مؤهل
+    Color? borderColor;
+    if (hasTopsis) {
+      borderColor = isQualified == true
+          ? Colors.green.withOpacity(0.3)
+          : Colors.red.withOpacity(0.3);
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       decoration: BoxDecoration(
         color: cardColor,
         borderRadius: BorderRadius.circular(15),
-        // تمييز المرتبة الأولى بحد ذهبي خفيف
-        border: rank == 1 && hasTopsis
-            ? Border.all(
-                color: const Color(0xFFFFD700).withOpacity(0.4),
-                width: 1.5,
-              )
+        border: borderColor != null
+            ? Border.all(color: borderColor, width: 1.2)
             : null,
       ),
       child: Column(
         children: [
-          // ── شريط TOPSIS في الأعلى ──────────────
+          // شريط علوي ملوّن
           if (hasTopsis)
             Container(
               height: 3,
@@ -557,7 +542,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Header: الاسم + الرتبة ──
+                // Header: اسم + رتبة
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -571,34 +556,32 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                         ),
                       ),
                     ),
-                    // ── Rank Badge ──
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _rankColor(rank).withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: _rankColor(rank).withOpacity(0.4),
+                    if (hasTopsis)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _rankColor(rank).withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: _rankColor(rank).withOpacity(0.4),
+                          ),
+                        ),
+                        child: Text(
+                          _rankLabel(rank),
+                          style: TextStyle(
+                            color: _rankColor(rank),
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                      child: Text(
-                        _rankLabel(rank),
-                        style: TextStyle(
-                          color: _rankColor(rank),
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
                   ],
                 ),
 
                 const SizedBox(height: 6),
-
-                // ── RFP Title ──
                 Row(
                   children: [
                     const Icon(
@@ -621,7 +604,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
 
                 const SizedBox(height: 10),
 
-                // ── TOPSIS Score Bar ──────────────────
+                // TOPSIS Score Bar + Qualified Badge
                 if (hasTopsis) ...[
                   Row(
                     children: [
@@ -632,6 +615,32 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Qualified / Below Threshold badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color:
+                              (isQualified == true ? Colors.green : Colors.red)
+                                  .withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          isQualified == true
+                              ? '✓ Qualified'
+                              : '✗ Below Threshold',
+                          style: TextStyle(
+                            color: isQualified == true
+                                ? Colors.green
+                                : Colors.red,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                       const Spacer(),
@@ -646,22 +655,81 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                     ],
                   ),
                   const SizedBox(height: 5),
-                  // Progress Bar
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
                       value: topsisScore.clamp(0.0, 1.0),
                       backgroundColor: Colors.white.withOpacity(0.08),
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        _rankColor(rank).withOpacity(0.8),
+                        isQualified == true
+                            ? _rankColor(rank).withOpacity(0.8)
+                            : Colors.red.withOpacity(0.6),
                       ),
                       minHeight: 6,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  // خط الـ Threshold عند 60%
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Threshold: ${(TopsisService.qualificationThreshold * 100).toInt()}%',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.3),
+                          fontSize: 10,
+                        ),
+                      ),
+                      if (isQualified == false)
+                        Text(
+                          'Below minimum',
+                          style: TextStyle(
+                            color: Colors.red.withOpacity(0.7),
+                            fontSize: 10,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                 ],
 
-                // ── Price + Date ──
+                // AI Insight
+                if (aiInsight != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3395FF).withOpacity(0.07),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFF3395FF).withOpacity(0.15),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.auto_awesome,
+                          color: Color(0xFF3395FF),
+                          size: 14,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            aiInsight,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 11,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+
+                // Price + Date
                 Row(
                   children: [
                     const Icon(
@@ -671,7 +739,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '$price SAR',
+                      '${price ?? '—'} SAR',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 13,
@@ -691,7 +759,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                   ],
                 ),
 
-                // ── Description ──
                 if (description.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
@@ -703,8 +770,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                 ],
 
                 const SizedBox(height: 10),
-
-                // ── Status Badge ──
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
