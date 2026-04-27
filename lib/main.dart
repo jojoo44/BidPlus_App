@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login_screen.dart';
 
-// Helper توصل لـ Supabase من أي مكان في المشروع
 final supabase = Supabase.instance.client;
 
 void main() async {
