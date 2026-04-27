@@ -8,7 +8,6 @@ import 'rfp_selector_screen.dart';
 import 'active_rfp_details_screen.dart';
 import 'notifications_screen.dart';
 import 'negotiation_mng_screen.dart';
-import 'contractor_evaluation_screen.dart';
 import 'login_screen.dart';
 import '../main.dart';
 
@@ -266,19 +265,6 @@ class _BidPlusState extends State<BidPlus> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => const NegotiationArchiveScreen(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 15),
-                  _buildQuickAction(
-                    context,
-                    "Rate Team",
-                    Icons.star_rate,
-                    Colors.amber,
-                    () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ContractorEvaluationScreen(),
                       ),
                     ),
                   ),
