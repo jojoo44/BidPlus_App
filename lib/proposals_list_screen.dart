@@ -4,7 +4,6 @@ import 'qualified_contractors_screen.dart';
 import 'topsis_service.dart';
 import '../main.dart';
 import 'manager_proposal_details_screen.dart';
-import 'dart:math';
 
 class ProposalsListScreen extends StatefulWidget {
   final String? rfpId;
@@ -18,7 +17,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
   List<Map<String, dynamic>> _proposals = [];
   List<Map<String, dynamic>> _filtered = [];
   bool _isLoading = true;
-  bool _isAnalyzing = false; // ← حالة زر Analyze
+  bool _isAnalyzing = false;
   bool _topsisApplied = false;
   String? _evaluationCriteria;
 
@@ -37,9 +36,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
     super.dispose();
   }
 
-  // ─────────────────────────────────────────────
-  //  Load Proposals (بدون TOPSIS — الترتيب بالتاريخ)
-  // ─────────────────────────────────────────────
   Future<void> _loadProposals() async {
     setState(() => _isLoading = true);
     try {
@@ -57,11 +53,18 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
         _evaluationCriteria = rfpData?['evaluationCriteria'];
 
         final data = await supabase
-            .from('proposals_with_username')
-            .select('*, RFP(title, rfpID)')
+            .from('proposals')
+            .select(
+              '*, RFP(rfpID, title, deadline, budget), User:submitterUserId(username)',
+            )
             .eq('RFP', widget.rfpId!)
             .order('submitDate', ascending: false);
-        proposals = List<Map<String, dynamic>>.from(data);
+
+        proposals = (data as List).map((p) {
+          final map = Map<String, dynamic>.from(p);
+          map['contractorname'] = p['User']?['username'] ?? 'Unknown';
+          return map;
+        }).toList();
       } else {
         final rfpData = await supabase
             .from('RFP')
@@ -78,11 +81,18 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
             : null;
 
         final data = await supabase
-            .from('proposals_with_username')
-            .select('*, RFP(title, rfpID)')
+            .from('proposals')
+            .select(
+              '*, RFP(rfpID, title, deadline, budget), User:submitterUserId(username)',
+            )
             .inFilter('RFP', rfpIds)
             .order('submitDate', ascending: false);
-        proposals = List<Map<String, dynamic>>.from(data);
+
+        proposals = (data as List).map((p) {
+          final map = Map<String, dynamic>.from(p);
+          map['contractorname'] = p['User']?['username'] ?? 'Unknown';
+          return map;
+        }).toList();
       }
 
       if (mounted) {
@@ -99,9 +109,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
     }
   }
 
-  // ─────────────────────────────────────────────
-  //  Analyze & Rank — ضغطة الزر
-  // ─────────────────────────────────────────────
   Future<void> _analyzeAndRank() async {
     final weights = TopsisService.parseWeights(_evaluationCriteria);
     if (weights.isEmpty) {
@@ -132,13 +139,11 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
     setState(() => _isAnalyzing = true);
 
     try {
-      // تشغيل TOPSIS
       final results = TopsisService.analyze(
         proposals: withScores,
         weights: weights,
       );
 
-      // ادمج النتائج مع بيانات الـ proposals
       final rankedProposals = <Map<String, dynamic>>[];
       for (int i = 0; i < results.length; i++) {
         final r = results[i];
@@ -155,7 +160,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
         });
       }
 
-      // proposals بدون scores تجي في الآخر
       final withoutScores = _proposals
           .where(
             (p) =>
@@ -173,7 +177,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
         });
       }
 
-      // انتقل للـ Qualified screen
       if (mounted) {
         Navigator.push(
           context,
@@ -208,15 +211,11 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
     });
   }
 
-  // ─────────────────────────────────────────────
-  //  BUILD
-  // ─────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     const bgColor = Color(0xFF0D1219);
     const cardColor = Color(0xFF1C242F);
 
-    // عدد proposals عندها AI scores
     final scoredCount = _proposals
         .where(
           (p) =>
@@ -258,13 +257,11 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
       ),
       body: Column(
         children: [
-          // ── Search ──
           Padding(
             padding: const EdgeInsets.fromLTRB(15, 15, 15, 10),
             child: _buildSearchField(),
           ),
 
-          // ── زر Analyze & Rank ───────────────────
           if (!_isLoading && scoredCount >= 2)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 15),
@@ -310,7 +307,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
               ),
             ),
 
-          // ── لو ما في proposals مكتملة ──
           if (!_isLoading && scoredCount < 2 && _proposals.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 4),
@@ -349,7 +345,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
 
           const SizedBox(height: 8),
 
-          // ── Count ──
           if (!_isLoading)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 15),
@@ -376,7 +371,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
 
           const SizedBox(height: 8),
 
-          // ── List ──
           Expanded(
             child: _isLoading
                 ? const Center(
@@ -435,10 +429,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
       ),
     );
   }
-
-  // ─────────────────────────────────────────────
-  //  WIDGETS
-  // ─────────────────────────────────────────────
 
   Color _rankColor(int rank) {
     if (rank == 1) return const Color(0xFFFFD700);
@@ -501,7 +491,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
     final hasTopsis = topsisScore >= 0;
     final scorePercent = (topsisScore * 100).toStringAsFixed(1);
 
-    // لون الحدود: أخضر مؤهل، أحمر غير مؤهل
     Color? borderColor;
     if (hasTopsis) {
       borderColor = isQualified == true
@@ -520,7 +509,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
       ),
       child: Column(
         children: [
-          // شريط علوي ملوّن
           if (hasTopsis)
             Container(
               height: 3,
@@ -536,13 +524,11 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                 ),
               ),
             ),
-
           Padding(
             padding: const EdgeInsets.all(15),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header: اسم + رتبة
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -580,7 +566,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                       ),
                   ],
                 ),
-
                 const SizedBox(height: 6),
                 Row(
                   children: [
@@ -601,10 +586,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 10),
-
-                // TOPSIS Score Bar + Qualified Badge
                 if (hasTopsis) ...[
                   Row(
                     children: [
@@ -618,7 +600,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // Qualified / Below Threshold badge
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -668,7 +649,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                       minHeight: 6,
                     ),
                   ),
-                  // خط الـ Threshold عند 60%
                   const SizedBox(height: 4),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -692,8 +672,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                   ),
                   const SizedBox(height: 8),
                 ],
-
-                // AI Insight
                 if (aiInsight != null) ...[
                   Container(
                     padding: const EdgeInsets.all(10),
@@ -728,8 +706,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                   ),
                   const SizedBox(height: 8),
                 ],
-
-                // Price + Date
                 Row(
                   children: [
                     const Icon(
@@ -758,7 +734,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                     ),
                   ],
                 ),
-
                 if (description.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
@@ -768,7 +743,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                     style: const TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                 ],
-
                 const SizedBox(height: 10),
                 Container(
                   padding: const EdgeInsets.symmetric(
