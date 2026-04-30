@@ -38,6 +38,12 @@ class _QualifiedContractorsScreenState
   int get _qualifiedCount => _results.where((r) => r.isQualified).length;
   int get _totalCount => _results.length;
 
+  // ← الجديد: threshold ديناميكي من أوزان الـ RFP
+  double get _rfpThreshold =>
+      widget.weights != null && widget.weights!.isNotEmpty
+      ? TopsisService.calculateRFPThreshold(widget.weights!)
+      : TopsisService.qualificationThreshold;
+
   @override
   void initState() {
     super.initState();
@@ -129,14 +135,11 @@ class _QualifiedContractorsScreenState
     }
   }
 
-  // ─────────────────────────────────────────────
-  //  Invite → يحفظ في NegoSession ثم يفتح CriteriaSelectionScreen
-  // ─────────────────────────────────────────────
   Future<void> _invite(TopsisResult result) async {
     try {
       await supabase.from('NegoSession').insert({
         'rfp_id': widget.rfpId,
-        'contractor_id': result.contractorId, // submitterUserId (uuid)
+        'contractor_id': result.contractorId,
         'status': 'Invited',
         'start_date': DateTime.now().toIso8601String(),
       });
@@ -150,7 +153,6 @@ class _QualifiedContractorsScreenState
           ),
         );
 
-        // ← الجديد: افتح CriteriaSelectionScreen بعد الـ Invite
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -170,12 +172,10 @@ class _QualifiedContractorsScreenState
     }
   }
 
-  // ─────────────────────────────────────────────
-  //  BUILD
-  // ─────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final threshold = TopsisService.qualificationThreshold * 100;
+    // ← الجديد: threshold من الـ RFP مو ثابت
+    final thresholdPercent = _rfpThreshold * 100;
 
     return Scaffold(
       backgroundColor: bgColor,
@@ -234,7 +234,6 @@ class _QualifiedContractorsScreenState
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
                   child: Column(
                     children: [
-                      // Search
                       TextField(
                         controller: _searchController,
                         style: const TextStyle(color: Colors.white),
@@ -256,7 +255,7 @@ class _QualifiedContractorsScreenState
 
                       const SizedBox(height: 12),
 
-                      // Info Banner
+                      // ← الجديد: Banner يعرض الـ threshold الحقيقي للـ RFP
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(
@@ -293,9 +292,9 @@ class _QualifiedContractorsScreenState
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'Threshold: ${threshold.toInt()}%  ·  '
-                              '$_qualifiedCount qualified  ·  '
-                              '${_totalCount - _qualifiedCount} below threshold',
+                              'RFP Threshold: ${thresholdPercent.toStringAsFixed(0)}%'
+                              '  ·  $_qualifiedCount qualified'
+                              '  ·  ${_totalCount - _qualifiedCount} below threshold',
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.5),
                                 fontSize: 11,
@@ -307,7 +306,6 @@ class _QualifiedContractorsScreenState
 
                       const SizedBox(height: 10),
 
-                      // Toggle
                       Row(
                         children: [
                           _filterChip('Qualified only', !_showAll, () {
@@ -347,7 +345,7 @@ class _QualifiedContractorsScreenState
                                 _showAll
                                     ? 'No results'
                                     : 'No contractors met the '
-                                          '${threshold.toInt()}% threshold',
+                                          '${thresholdPercent.toStringAsFixed(0)}% threshold',
                                 style: const TextStyle(
                                   color: Colors.grey,
                                   fontSize: 14,
@@ -367,10 +365,6 @@ class _QualifiedContractorsScreenState
             ),
     );
   }
-
-  // ─────────────────────────────────────────────
-  //  WIDGETS
-  // ─────────────────────────────────────────────
 
   Widget _filterChip(String label, bool selected, VoidCallback onTap) =>
       GestureDetector(
@@ -397,7 +391,8 @@ class _QualifiedContractorsScreenState
 
   Widget _buildResultCard(TopsisResult result, int rank) {
     final isQualified = result.isQualified;
-    final threshold = TopsisService.qualificationThreshold;
+    // ← الجديد: threshold الكارد من الـ RFP
+    final threshold = _rfpThreshold;
     final scorePercent = result.ciPercent.toStringAsFixed(1);
 
     final medalColor = rank == 1 && isQualified
@@ -516,7 +511,6 @@ class _QualifiedContractorsScreenState
                         ],
                       ),
                     ),
-                    // Invite Button — مؤهلين فقط
                     if (isQualified)
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
@@ -540,7 +534,6 @@ class _QualifiedContractorsScreenState
 
                 const SizedBox(height: 12),
 
-                // Progress Bar
                 Stack(
                   children: [
                     ClipRRect(
@@ -573,8 +566,9 @@ class _QualifiedContractorsScreenState
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+                    // ← الجديد: يعرض الـ threshold الحقيقي للـ RFP
                     Text(
-                      'Threshold: ${(threshold * 100).toInt()}%',
+                      'RFP Threshold: ${(threshold * 100).toStringAsFixed(0)}%',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.35),
                         fontSize: 10,
@@ -592,7 +586,6 @@ class _QualifiedContractorsScreenState
                   ],
                 ),
 
-                // Criteria Breakdown
                 if (result.criteriaScores.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Wrap(
@@ -628,7 +621,6 @@ class _QualifiedContractorsScreenState
                   ),
                 ],
 
-                // AI Insight
                 const SizedBox(height: 10),
                 Container(
                   padding: const EdgeInsets.all(10),
