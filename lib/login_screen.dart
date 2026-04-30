@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'role_selection_screen.dart';
+import 'welcome_screen.dart';
 import 'dashboard.dart';
 import 'contractor_dashboard_screen.dart';
 import '../main.dart';
@@ -102,13 +103,27 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF121826),
+      // ✅ زر الرجوع للـ Welcome
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF121826),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+            );
+          },
+        ),
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 30),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.lock_outline, size: 80, color: Colors.blue),
+              Image.asset('assets/logoGp00.png', height: 130, width: 130),
               const SizedBox(height: 20),
               const Text(
                 "Welcome Back",
