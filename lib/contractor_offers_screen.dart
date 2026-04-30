@@ -29,7 +29,7 @@ class _ContractorOffersScreenState extends State<ContractorOffersScreen> {
           .from('proposals')
           .select('*, RFP(*)')
           .eq('submitterUserId', userId)
-          .order('submissionDate', ascending: false);
+          .order('ProposalID', ascending: false);
 
       if (mounted) {
         setState(() {
