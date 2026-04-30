@@ -53,11 +53,18 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
         _evaluationCriteria = rfpData?['evaluationCriteria'];
 
         final data = await supabase
-            .from('proposals_with_username')
-            .select('*, RFP(title, rfpID)')
+            .from('proposals')
+            .select(
+              '*, RFP(rfpID, title, deadline, budget), User:submitterUserId(username)',
+            )
             .eq('RFP', widget.rfpId!)
             .order('submitDate', ascending: false);
-        proposals = List<Map<String, dynamic>>.from(data);
+
+        proposals = (data as List).map((p) {
+          final map = Map<String, dynamic>.from(p);
+          map['contractorname'] = p['User']?['username'] ?? 'Unknown';
+          return map;
+        }).toList();
       } else {
         final rfpData = await supabase
             .from('RFP')
@@ -74,11 +81,18 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
             : null;
 
         final data = await supabase
-            .from('proposals_with_username')
-            .select('*, RFP(title, rfpID)')
+            .from('proposals')
+            .select(
+              '*, RFP(rfpID, title, deadline, budget), User:submitterUserId(username)',
+            )
             .inFilter('RFP', rfpIds)
             .order('submitDate', ascending: false);
-        proposals = List<Map<String, dynamic>>.from(data);
+
+        proposals = (data as List).map((p) {
+          final map = Map<String, dynamic>.from(p);
+          map['contractorname'] = p['User']?['username'] ?? 'Unknown';
+          return map;
+        }).toList();
       }
 
       if (mounted) {
@@ -201,7 +215,10 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
     const bgColor = Color(0xFF0D1219);
     const cardColor = Color(0xFF1C242F);
 
+<<<<<<< HEAD
     // ← تغيير 2: يكفي مقاول واحد
+=======
+>>>>>>> 086f55cc655c5589b5163a5a8f687542cc38e403
     final scoredCount = _proposals
         .where(
           (p) =>
@@ -254,8 +271,12 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
             child: _buildSearchField(),
           ),
 
+<<<<<<< HEAD
           // ← تغيير 2: يظهر الزر من مقاول واحد
           if (!_isLoading && scoredCount >= 1)
+=======
+          if (!_isLoading && scoredCount >= 2)
+>>>>>>> 086f55cc655c5589b5163a5a8f687542cc38e403
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 15),
               child: SizedBox(
@@ -300,8 +321,12 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
               ),
             ),
 
+<<<<<<< HEAD
           // ← لو ما في proposals عندها scores
           if (!_isLoading && scoredCount < 1 && _proposals.isNotEmpty)
+=======
+          if (!_isLoading && scoredCount < 2 && _proposals.isNotEmpty)
+>>>>>>> 086f55cc655c5589b5163a5a8f687542cc38e403
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 4),
               child: Container(
@@ -520,7 +545,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                 ),
               ),
             ),
-
           Padding(
             padding: const EdgeInsets.all(15),
             child: Column(
@@ -563,7 +587,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                       ),
                   ],
                 ),
-
                 const SizedBox(height: 6),
                 Row(
                   children: [
@@ -584,9 +607,11 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 10),
+<<<<<<< HEAD
 
+=======
+>>>>>>> 086f55cc655c5589b5163a5a8f687542cc38e403
                 if (hasTopsis) ...[
                   Row(
                     children: [
@@ -673,7 +698,10 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                   ),
                   const SizedBox(height: 8),
                 ],
+<<<<<<< HEAD
 
+=======
+>>>>>>> 086f55cc655c5589b5163a5a8f687542cc38e403
                 if (aiInsight != null) ...[
                   Container(
                     padding: const EdgeInsets.all(10),
@@ -708,7 +736,10 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                   ),
                   const SizedBox(height: 8),
                 ],
+<<<<<<< HEAD
 
+=======
+>>>>>>> 086f55cc655c5589b5163a5a8f687542cc38e403
                 Row(
                   children: [
                     const Icon(
@@ -737,7 +768,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                     ),
                   ],
                 ),
-
                 if (description.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
@@ -747,7 +777,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                     style: const TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                 ],
-
                 const SizedBox(height: 10),
                 Container(
                   padding: const EdgeInsets.symmetric(
