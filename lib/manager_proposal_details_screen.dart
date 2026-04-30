@@ -1,7 +1,8 @@
 // manager_proposal_details_screen.dart
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
-import 'contractor_profile_screen.dart'; // ← أضفنا الـ import
+import 'contractor_profile_screen.dart';
 
 class ManagerProposalDetailsScreen extends StatefulWidget {
   final Map<String, dynamic> proposal;
@@ -22,19 +23,47 @@ class _ManagerProposalDetailsScreenState
     extends State<ManagerProposalDetailsScreen> {
   late String _status;
   bool _isLoading = false;
+  List<Map<String, dynamic>> _documents = [];
+  bool _loadingDocs = true;
 
   static const bg = Color(0xFF0D1219);
   static const card = Color(0xFF1C242F);
   static const stroke = Color(0xFF22314A);
-  static const blue = Color(0xFF3395FF); // ← أضفنا اللون
+  static const blue = Color(0xFF3395FF);
 
   @override
   void initState() {
     super.initState();
     _status = widget.proposal['status'] ?? 'Submitted';
+    _loadDocuments();
   }
 
-  // ── دالة فتح بروفايل الكونتراكتور ──────────────────────────────────────────
+  // ── جلب ملفات المقاول ──────────────────────────────────────────────────────
+  Future<void> _loadDocuments() async {
+    try {
+      final proposalId = widget.proposal['ProposalID'];
+      if (proposalId == null) {
+        setState(() => _loadingDocs = false);
+        return;
+      }
+      final data = await supabase
+          .from('Document')
+          .select('*')
+          .eq('proposalID', proposalId)
+          .order('uploadDate', ascending: false);
+
+      if (mounted) {
+        setState(() {
+          _documents = List<Map<String, dynamic>>.from(data);
+          _loadingDocs = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading documents: $e');
+      if (mounted) setState(() => _loadingDocs = false);
+    }
+  }
+
   void _openContractorProfile() {
     final contractorId = widget.proposal['submitterUserId'];
     if (contractorId == null) return;
@@ -44,6 +73,19 @@ class _ManagerProposalDetailsScreenState
         builder: (_) => ContractorProfileScreen(contractorId: contractorId),
       ),
     );
+  }
+
+  Future<void> _openFile(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Cannot open file')));
+      }
+    }
   }
 
   Future<void> _updateStatus(String newStatus) async {
@@ -160,6 +202,36 @@ class _ManagerProposalDetailsScreenState
     }
   }
 
+  IconData _fileIcon(String? uploadType) {
+    switch ((uploadType ?? '').toLowerCase()) {
+      case 'pdf':
+        return Icons.picture_as_pdf;
+      case 'image':
+        return Icons.image;
+      case 'word':
+        return Icons.description;
+      case 'excel':
+        return Icons.table_chart;
+      default:
+        return Icons.insert_drive_file;
+    }
+  }
+
+  Color _fileColor(String? uploadType) {
+    switch ((uploadType ?? '').toLowerCase()) {
+      case 'pdf':
+        return Colors.red;
+      case 'image':
+        return Colors.blue;
+      case 'word':
+        return Colors.blueAccent;
+      case 'excel':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final rfp = widget.proposal['RFP'] as Map<String, dynamic>? ?? {};
@@ -250,7 +322,7 @@ class _ManagerProposalDetailsScreenState
 
             const SizedBox(height: 20),
 
-            // ── Contractor Info ──────────────────────────────────────────────
+            // Contractor Info
             _sectionTitle('Contractor Info'),
             Container(
               padding: const EdgeInsets.all(16),
@@ -264,8 +336,6 @@ class _ManagerProposalDetailsScreenState
                   _row(Icons.person, 'Name', name),
                   _row(Icons.attach_money, 'Proposed Price', '$price SAR'),
                   _row(Icons.send, 'Submitted On', date),
-
-                  // فاصل + زر View Profile
                   const Divider(color: Color(0xFF22314A), height: 24),
                   SizedBox(
                     width: double.infinity,
@@ -306,6 +376,110 @@ class _ManagerProposalDetailsScreenState
 
             const SizedBox(height: 16),
 
+            // ── Submitted Documents ──────────────────────────────────────────
+            _sectionTitle('Submitted Documents'),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: card,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: stroke),
+              ),
+              child: _loadingDocs
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: CircularProgressIndicator(color: blue),
+                      ),
+                    )
+                  : _documents.isEmpty
+                  ? const Row(
+                      children: [
+                        Icon(Icons.folder_open, color: Colors.grey, size: 20),
+                        SizedBox(width: 10),
+                        Text(
+                          'No documents submitted',
+                          style: TextStyle(color: Colors.grey, fontSize: 13),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      children: _documents.map((doc) {
+                        final fileName = doc['fullName'] ?? 'Unnamed File';
+                        final fileUrl = doc['fileURL'] ?? '';
+                        final uploadType = doc['uploadType'];
+                        final uploadDate = doc['uploadDate'] ?? '';
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0D1219),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: stroke),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: _fileColor(
+                                    uploadType,
+                                  ).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  _fileIcon(uploadType),
+                                  color: _fileColor(uploadType),
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      fileName,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (uploadDate.isNotEmpty)
+                                      Text(
+                                        uploadDate,
+                                        style: const TextStyle(
+                                          color: Colors.grey,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: fileUrl.isNotEmpty
+                                    ? () => _openFile(fileUrl)
+                                    : null,
+                                icon: const Icon(
+                                  Icons.open_in_new,
+                                  color: blue,
+                                  size: 20,
+                                ),
+                                tooltip: 'Open File',
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+            ),
+
+            const SizedBox(height: 16),
+
             // Cover Letter
             if (desc.isNotEmpty) ...[
               _sectionTitle('Cover Letter'),
@@ -329,7 +503,7 @@ class _ManagerProposalDetailsScreenState
               const SizedBox(height: 16),
             ],
 
-            // Criteria Responses
+            // Evaluation Criteria Responses
             if (comments.isNotEmpty) ...[
               _sectionTitle('Evaluation Criteria Responses'),
               Container(
