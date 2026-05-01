@@ -38,7 +38,6 @@ class _QualifiedContractorsScreenState
   int get _qualifiedCount => _results.where((r) => r.isQualified).length;
   int get _totalCount => _results.length;
 
-  // ← الجديد: threshold ديناميكي من أوزان الـ RFP
   double get _rfpThreshold =>
       widget.weights != null && widget.weights!.isNotEmpty
       ? TopsisService.calculateRFPThreshold(widget.weights!)
@@ -135,14 +134,25 @@ class _QualifiedContractorsScreenState
     }
   }
 
+  // ─────────────────────────────────────────────
+  //  Invite — يحفظ NegoSession ويجيب session_id
+  //  ثم يمرره لـ CriteriaSelectionScreen
+  // ─────────────────────────────────────────────
   Future<void> _invite(TopsisResult result) async {
     try {
-      await supabase.from('NegoSession').insert({
-        'rfp_id': widget.rfpId,
-        'contractor_id': result.contractorId,
-        'status': 'Invited',
-        'start_date': DateTime.now().toIso8601String(),
-      });
+      // ← الجديد: .select('session_id').single() عشان نجيب الـ ID
+      final sessionData = await supabase
+          .from('NegoSession')
+          .insert({
+            'rfp_id': widget.rfpId,
+            'contractor_id': result.contractorId,
+            'status': 'Invited',
+            'start_date': DateTime.now().toIso8601String(),
+          })
+          .select('session_id')
+          .single();
+
+      final sessionId = sessionData['session_id']?.toString() ?? '';
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -153,12 +163,14 @@ class _QualifiedContractorsScreenState
           ),
         );
 
+        // ← الجديد: مرر sessionId عشان الـ Realtime يشتغل
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => CriteriaSelectionScreen(
               contractorName: result.contractorName,
               rfpId: widget.rfpId ?? '',
+              sessionId: sessionId, // ← هذا اللي كان ناقص
             ),
           ),
         );
@@ -174,7 +186,6 @@ class _QualifiedContractorsScreenState
 
   @override
   Widget build(BuildContext context) {
-    // ← الجديد: threshold من الـ RFP مو ثابت
     final thresholdPercent = _rfpThreshold * 100;
 
     return Scaffold(
@@ -255,7 +266,6 @@ class _QualifiedContractorsScreenState
 
                       const SizedBox(height: 12),
 
-                      // ← الجديد: Banner يعرض الـ threshold الحقيقي للـ RFP
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(
@@ -391,7 +401,6 @@ class _QualifiedContractorsScreenState
 
   Widget _buildResultCard(TopsisResult result, int rank) {
     final isQualified = result.isQualified;
-    // ← الجديد: threshold الكارد من الـ RFP
     final threshold = _rfpThreshold;
     final scorePercent = result.ciPercent.toStringAsFixed(1);
 
@@ -566,7 +575,6 @@ class _QualifiedContractorsScreenState
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // ← الجديد: يعرض الـ threshold الحقيقي للـ RFP
                     Text(
                       'RFP Threshold: ${(threshold * 100).toStringAsFixed(0)}%',
                       style: TextStyle(

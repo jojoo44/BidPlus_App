@@ -46,9 +46,9 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
   bool _isLoading = true;
   bool _isSending = false;
   bool _isUploadingContract = false;
-  bool _isGeneratingSuggestion = false; // NEW
+  bool _isGeneratingSuggestion = false;
   bool _showAISuggestion = true;
-  String _aiSuggestionText = ''; // NEW
+  String _aiSuggestionText = '';
   String _sessionStatus = 'Active';
   String? _contractId;
   String _contractStatus = '';
@@ -128,6 +128,8 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
   }
 
   void _subscribeRealtime() {
+    debugPrint('=== REALTIME sessionId: "${widget.sessionId}" ===');
+
     _channel = supabase
         .channel('ai_nego_${widget.sessionId}')
         .onPostgresChanges(
@@ -135,11 +137,17 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           schema: 'public',
           table: 'NegoRounds',
           callback: (payload) {
+            debugPrint('=== REALTIME RECEIVED: ${payload.newRecord} ===');
             final newRow = payload.newRecord;
             final rowSession = newRow['sessionID']?.toString();
-            if (rowSession == widget.sessionId && mounted) {
-              setState(() => _rounds.add(newRow));
-              _scrollToBottom();
+            debugPrint(
+              '=== rowSession: "$rowSession" vs widget: "${widget.sessionId}" ===',
+            );
+            if (rowSession == widget.sessionId) {
+              if (mounted) {
+                setState(() => _rounds.add(newRow));
+                _scrollToBottom();
+              }
             }
           },
         )
@@ -175,9 +183,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     return sessionId;
   }
 
-  // ═══════════════════════════════════════════════════
-  // NEW: Generate AI Suggestion from negotiate_suggest
-  // ═══════════════════════════════════════════════════
   Future<void> _generateAISuggestion() async {
     setState(() {
       _isGeneratingSuggestion = true;
@@ -201,9 +206,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
       );
 
       final suggestion = response.data['suggestion']?.toString() ?? '';
-      if (mounted) {
-        setState(() => _aiSuggestionText = suggestion);
-      }
+      if (mounted) setState(() => _aiSuggestionText = suggestion);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -215,9 +218,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     }
   }
 
-  // ═══════════════════════════════════════════════════
-  // NEW: Extract final terms from negotiate_extract
-  // ═══════════════════════════════════════════════════
   Future<void> _completeNegotiation() async {
     setState(() => _isGeneratingSuggestion = true);
     try {
@@ -296,6 +296,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             .single();
         final rfpId = session['rfp_id'];
         String? recipientId;
+
         if (widget.isManager) {
           recipientId = session['contractor_id']?.toString();
           if (recipientId == null && rfpId != null) {
@@ -317,6 +318,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             recipientId = rfp['creatorUser']?.toString();
           }
         }
+
         if (recipientId != null) {
           await supabase.from('Notification').insert({
             'userID': recipientId,
@@ -758,7 +760,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  // ← استدعاء الـ Edge Function هنا
                   onPressed: _isGeneratingSuggestion
                       ? null
                       : _generateAISuggestion,
@@ -788,7 +789,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
               ),
             ),
 
-          // Manager: upload contract + view signed contract
+          // Manager: upload contract
           if (widget.isManager)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -1091,7 +1092,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
               ),
             ),
 
-          // Negotiation Completed button — يستدعي negotiate-extract
+          // Negotiation Completed button
           if (widget.isManager && !isCompleted)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -1105,7 +1106,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                       borderRadius: BorderRadius.circular(30),
                     ),
                   ),
-                  // ← استدعاء الـ Edge Function هنا
                   onPressed: _isGeneratingSuggestion
                       ? null
                       : _completeNegotiation,
@@ -1262,13 +1262,13 @@ class _ChatBubble extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════
-// AIContractReviewScreen — يستقبل البيانات من الـ AI
+// AIContractReviewScreen
 // ═══════════════════════════════════════════════════
 class AIContractReviewScreen extends StatefulWidget {
   final String contractorName, proposalId;
-  final String finalPrice; // NEW
-  final String duration; // NEW
-  final String terms; // NEW
+  final String finalPrice;
+  final String duration;
+  final String terms;
 
   const AIContractReviewScreen({
     super.key,
@@ -1291,16 +1291,9 @@ class _AIContractReviewScreenState extends State<AIContractReviewScreen> {
   @override
   void initState() {
     super.initState();
-    // يملأ الحقول بالبيانات من الـ AI، أو قيم افتراضية إذا فاضية
-    _priceCtrl = TextEditingController(
-      text: widget.finalPrice.isNotEmpty ? widget.finalPrice : '',
-    );
-    _durationCtrl = TextEditingController(
-      text: widget.duration.isNotEmpty ? widget.duration : '',
-    );
-    _termsCtrl = TextEditingController(
-      text: widget.terms.isNotEmpty ? widget.terms : '',
-    );
+    _priceCtrl = TextEditingController(text: widget.finalPrice);
+    _durationCtrl = TextEditingController(text: widget.duration);
+    _termsCtrl = TextEditingController(text: widget.terms);
   }
 
   @override

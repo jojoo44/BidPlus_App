@@ -91,7 +91,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     } else if (type.contains('negotiation') || type.contains('message')) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const NegotiationArchiveScreen()),
+        MaterialPageRoute(builder: (_) => NegotiationArchiveScreen()),
       );
     }
   }

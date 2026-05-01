@@ -38,40 +38,68 @@ class _ContractorNegotiationScreenState
     try {
       final sessionIdInt = int.tryParse(sessionId) ?? sessionId;
       final sessionData = await supabase
-          .from('NegoSession').select().eq('session_id', sessionIdInt).single();
+          .from('NegoSession')
+          .select()
+          .eq('session_id', sessionIdInt)
+          .single();
+
       final rfpId = sessionData['rfp_id']?.toString() ?? '';
       String rfpTitle = '—', managerName = '—', proposalId = '';
       List<String> criteria = [];
+
       try {
-        final rfp = await supabase.from('RFP')
+        final rfp = await supabase
+            .from('RFP')
             .select('title, creatorUser, evaluationCriteria')
-            .eq('rfpID', rfpId).single();
+            .eq('rfpID', rfpId)
+            .single();
         rfpTitle = rfp['title'] ?? '—';
-        final manager = await supabase.from('User')
-            .select('username').eq('id', rfp['creatorUser']).single();
+
+        final manager = await supabase
+            .from('User')
+            .select('username')
+            .eq('id', rfp['creatorUser'])
+            .single();
         managerName = manager['username'] ?? '—';
+
         final raw = rfp['evaluationCriteria'] as String?;
         if (raw != null && raw.isNotEmpty) {
-          criteria = raw.split(',').map((p) {
-            final idx = p.indexOf(':');
-            return idx == -1 ? p.trim() : p.substring(0, idx).trim();
-          }).toList();
+          criteria = raw
+              .split(',')
+              .map((p) {
+                final idx = p.indexOf(':');
+                return idx == -1 ? p.trim() : p.substring(0, idx).trim();
+              })
+              .where((c) => c.isNotEmpty)
+              .toList();
         }
       } catch (_) {}
+
       try {
-        final proposal = await supabase.from('proposals')
-            .select('ProposalID').eq('RFP', rfpId)
-            .eq('submitterUserId', _contractorId!).single();
-        proposalId = proposal['ProposalID']?.toString() ?? '';
+        final proposal = await supabase
+            .from('proposals')
+            .select('ProposalID')
+            .eq('RFP', rfpId)
+            .eq('submitterUserId', _contractorId!)
+            .maybeSingle();
+        proposalId = proposal?['ProposalID']?.toString() ?? '';
       } catch (_) {}
+
       if (mounted) {
-        Navigator.pushReplacement(context, MaterialPageRoute(
-          builder: (_) => AINegotiationScreen(
-            sessionId: sessionId, rfpId: rfpId, rfpTitle: rfpTitle,
-            contractorName: managerName, selectedCriteria: criteria,
-            proposalId: proposalId, isManager: false,
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AINegotiationScreen(
+              sessionId: sessionId,
+              rfpId: rfpId,
+              rfpTitle: rfpTitle,
+              contractorName: managerName,
+              selectedCriteria: criteria,
+              proposalId: proposalId,
+              isManager: false,
+            ),
           ),
-        ));
+        );
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
@@ -82,50 +110,110 @@ class _ContractorNegotiationScreenState
     setState(() => _isLoading = true);
     try {
       if (_contractorId == null) return;
-      final proposals = await supabase.from('proposals')
-          .select('RFP, ProposalID').eq('submitterUserId', _contractorId!)
-          .eq('status', 'Accepted');
-      final rfpIds = (proposals as List).map((p) => p['RFP'])
-          .where((id) => id != null).toList();
-      if (rfpIds.isEmpty) { if (mounted) setState(() => _isLoading = false); return; }
-      final sessionsData = await supabase.from('NegoSession').select()
-          .inFilter('rfp_id', rfpIds).order('start_date', ascending: false);
+
+      // ← الجديد: جيب الـ sessions مباشرة بـ contractor_id
+      // بدل ما نمر على proposals بـ status='Accepted'
+      final sessionsData = await supabase
+          .from('NegoSession')
+          .select()
+          .eq('contractor_id', _contractorId!)
+          .order('start_date', ascending: false);
+
+      debugPrint('=== contractorId: $_contractorId ===');
+      debugPrint('=== sessions found: ${(sessionsData as List).length} ===');
+      for (final s in sessionsData) {
+        debugPrint(
+          '=== session: ${s["session_id"]} rfp: ${s["rfp_id"]} status: ${s["status"]} ===',
+        );
+      }
+
+      if ((sessionsData as List).isEmpty) {
+        if (mounted)
+          setState(() {
+            _sessions = [];
+            _isLoading = false;
+          });
+        return;
+      }
+
       final enriched = <Map<String, dynamic>>[];
       for (final session in sessionsData) {
         final rfpId = session['rfp_id'];
-        final proposalRow = (proposals as List).firstWhere(
-            (p) => p['RFP'] == rfpId, orElse: () => {});
         try {
-          final rfp = await supabase.from('RFP')
+          final rfp = await supabase
+              .from('RFP')
               .select('title, creatorUser, evaluationCriteria')
-              .eq('rfpID', rfpId).single();
-          final manager = await supabase.from('User')
-              .select('username').eq('id', rfp['creatorUser']).single();
-          final lastMsg = await supabase.from('NegoRounds').select('Terms, created_at')
+              .eq('rfpID', rfpId)
+              .single();
+
+          final manager = await supabase
+              .from('User')
+              .select('username')
+              .eq('id', rfp['creatorUser'])
+              .single();
+
+          final lastMsg = await supabase
+              .from('NegoRounds')
+              .select('Terms, created_at')
               .eq('sessionID', session['session_id'])
-              .order('roundID', ascending: false).limit(1).maybeSingle();
+              .order('roundID', ascending: false)
+              .limit(1)
+              .maybeSingle();
+
           final raw = rfp['evaluationCriteria'] as String?;
           List<String> criteria = [];
           if (raw != null && raw.isNotEmpty) {
-            criteria = raw.split(',').map((p) {
-              final idx = p.indexOf(':');
-              return idx == -1 ? p.trim() : p.substring(0, idx).trim();
-            }).toList();
+            criteria = raw
+                .split(',')
+                .map((p) {
+                  final idx = p.indexOf(':');
+                  return idx == -1 ? p.trim() : p.substring(0, idx).trim();
+                })
+                .where((c) => c.isNotEmpty)
+                .toList();
           }
+
+          // جيب الـ proposalId
+          String proposalId = '';
+          try {
+            final proposal = await supabase
+                .from('proposals')
+                .select('ProposalID')
+                .eq('RFP', rfpId)
+                .eq('submitterUserId', _contractorId!)
+                .maybeSingle();
+            proposalId = proposal?['ProposalID']?.toString() ?? '';
+          } catch (_) {}
+
           enriched.add({
-            ...session, 'rfpTitle': rfp['title'] ?? '—',
-            'managerName': manager['username'] ?? '—', 'criteria': criteria,
-            'proposalId': proposalRow['ProposalID']?.toString() ?? '',
+            ...session,
+            'rfpTitle': rfp['title'] ?? '—',
+            'managerName': manager['username'] ?? '—',
+            'criteria': criteria,
+            'proposalId': proposalId,
             'lastMessage': lastMsg?['Terms'] ?? 'No messages yet',
             'lastTime': lastMsg?['created_at'],
           });
         } catch (_) {
-          enriched.add({...session, 'rfpTitle': '—', 'managerName': '—',
-              'criteria': <String>[], 'proposalId': '', 'lastMessage': 'No messages yet'});
+          enriched.add({
+            ...session,
+            'rfpTitle': '—',
+            'managerName': '—',
+            'criteria': <String>[],
+            'proposalId': '',
+            'lastMessage': 'No messages yet',
+          });
         }
       }
-      if (mounted) setState(() { _sessions = enriched; _isLoading = false; });
+
+      if (mounted) {
+        setState(() {
+          _sessions = enriched;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
+      debugPrint('ContractorNego error: $e');
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -134,94 +222,191 @@ class _ContractorNegotiationScreenState
     if (iso == null) return '';
     try {
       final dt = DateTime.parse(iso.toString()).toLocal();
-      return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
-    } catch (_) { return ''; }
+      return '${dt.hour.toString().padLeft(2, '0')}:'
+          '${dt.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return '';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     if (widget.sessionId != null) {
-      return Scaffold(backgroundColor: bg,
-          body: const Center(child: CircularProgressIndicator(color: Color(0xFF41C0FF))));
+      return Scaffold(
+        backgroundColor: bg,
+        body: const Center(
+          child: CircularProgressIndicator(color: Color(0xFF41C0FF)),
+        ),
+      );
     }
+
     return Scaffold(
       backgroundColor: bg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F1F3A), elevation: 0,
-        leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context)),
-        title: const Text('Negotiations',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF0F1F3A),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Negotiations',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF41C0FF)))
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF41C0FF)),
+            )
           : RefreshIndicator(
-              onRefresh: _loadSessions, color: accent,
+              onRefresh: _loadSessions,
+              color: accent,
               child: _sessions.isEmpty
-                  ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      const Icon(Icons.handshake_outlined, color: Colors.white24, size: 56),
-                      const SizedBox(height: 16),
-                      const Text('No negotiations yet',
-                          style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      Text('Once the manager accepts your proposal,\nnegotiation will appear here.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 13)),
-                    ]))
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.handshake_outlined,
+                            color: Colors.white24,
+                            size: 56,
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'No negotiations yet',
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Once the manager invites you,\nnegotiation will appear here.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.4),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
                   : ListView.separated(
                       itemCount: _sessions.length,
-                      separatorBuilder: (_, __) => Divider(color: Colors.white.withOpacity(0.05), height: 1),
+                      separatorBuilder: (_, __) => Divider(
+                        color: Colors.white.withOpacity(0.05),
+                        height: 1,
+                      ),
                       itemBuilder: (_, i) {
                         final s = _sessions[i];
-                        final isActive = s['status'] == 'Active';
+                        final isActive =
+                            s['status'] == 'Active' || s['status'] == 'Invited';
+
                         return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          leading: CircleAvatar(
-                            backgroundColor: isActive ? accent.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
-                            radius: 26,
-                            child: Icon(Icons.handshake_outlined,
-                                color: isActive ? accent : Colors.grey, size: 22),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
                           ),
-                          title: Row(children: [
-                            Expanded(child: Text(s['rfpTitle'] ?? '—',
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
-                                overflow: TextOverflow.ellipsis)),
-                            Text(_fmtTime(s['lastTime']),
-                                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11)),
-                          ]),
-                          subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            const SizedBox(height: 3),
-                            Text(s['lastMessage'] ?? '',
-                                style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13),
-                                maxLines: 1, overflow: TextOverflow.ellipsis),
-                            const SizedBox(height: 4),
-                            Row(children: [
-                              Text('Manager: ${s['managerName']}',
-                                  style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11)),
-                              const Spacer(),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: isActive ? Colors.orange.withOpacity(0.15) : Colors.green.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(10)),
-                                child: Text(s['status'] ?? '',
-                                    style: TextStyle(
-                                        color: isActive ? Colors.orangeAccent : Colors.greenAccent,
-                                        fontSize: 10, fontWeight: FontWeight.w700)),
-                              ),
-                            ]),
-                          ]),
-                          onTap: () => Navigator.push(context, MaterialPageRoute(
-                            builder: (_) => AINegotiationScreen(
-                              sessionId: s['session_id'].toString(),
-                              rfpId: s['rfp_id']?.toString() ?? '',
-                              rfpTitle: s['rfpTitle'] ?? '—',
-                              contractorName: s['managerName'] ?? '—',
-                              selectedCriteria: List<String>.from(s['criteria'] ?? []),
-                              proposalId: s['proposalId'] ?? '',
-                              isManager: false,
+                          leading: CircleAvatar(
+                            backgroundColor: isActive
+                                ? accent.withOpacity(0.2)
+                                : Colors.grey.withOpacity(0.2),
+                            radius: 26,
+                            child: Icon(
+                              Icons.handshake_outlined,
+                              color: isActive ? accent : Colors.grey,
+                              size: 22,
                             ),
-                          )).then((_) => _loadSessions()),
+                          ),
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  s['rfpTitle'] ?? '—',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Text(
+                                _fmtTime(s['lastTime']),
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.4),
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 3),
+                              Text(
+                                s['lastMessage'] ?? '',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.5),
+                                  fontSize: 13,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Text(
+                                    'Manager: ${s['managerName']}',
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.3),
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: isActive
+                                          ? Colors.orange.withOpacity(0.15)
+                                          : Colors.green.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      s['status'] ?? '',
+                                      style: TextStyle(
+                                        color: isActive
+                                            ? Colors.orangeAccent
+                                            : Colors.greenAccent,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => AINegotiationScreen(
+                                sessionId: s['session_id'].toString(),
+                                rfpId: s['rfp_id']?.toString() ?? '',
+                                rfpTitle: s['rfpTitle'] ?? '—',
+                                contractorName: s['managerName'] ?? '—',
+                                selectedCriteria: List<String>.from(
+                                  s['criteria'] ?? [],
+                                ),
+                                proposalId: s['proposalId'] ?? '',
+                                isManager: false,
+                              ),
+                            ),
+                          ).then((_) => _loadSessions()),
                         );
                       },
                     ),
