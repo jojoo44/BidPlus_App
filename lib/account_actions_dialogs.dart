@@ -72,8 +72,8 @@ class AccountActionsDialogs {
   }
 
   static void showDeleteAccountDialog(BuildContext context) {
-    final _confirmController = TextEditingController();
-    bool _isDeleting = false;
+    final confirmController = TextEditingController();
+    bool isDeleting = false;
 
     showDialog(
       context: context,
@@ -113,7 +113,7 @@ class AccountActionsDialogs {
               ),
               const SizedBox(height: 10),
               TextField(
-                controller: _confirmController,
+                controller: confirmController,
                 decoration: InputDecoration(
                   hintText: "DELETE",
                   hintStyle: const TextStyle(color: Colors.grey),
@@ -132,10 +132,10 @@ class AccountActionsDialogs {
                   backgroundColor: const Color(0xFF2D3243),
                   minimumSize: const Size(double.infinity, 50),
                 ),
-                onPressed: _isDeleting
+                onPressed: isDeleting
                     ? null
                     : () async {
-                        if (_confirmController.text.trim() != 'DELETE') {
+                        if (confirmController.text.trim() != 'DELETE') {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Please type DELETE to confirm'),
@@ -144,13 +144,10 @@ class AccountActionsDialogs {
                           );
                           return;
                         }
-                        setDialogState(() => _isDeleting = true);
+                        setDialogState(() => isDeleting = true);
                         try {
-                          final userId = supabase.auth.currentUser?.id;
-                          if (userId == null) return;
-
-                          // احذف بيانات المستخدم من جدول User
-                          await supabase.from('User').delete().eq('id', userId);
+                          // احذف من auth.users كاملاً عن طريق الـ Function
+                          await supabase.rpc('delete_user');
 
                           // سجّل الخروج
                           await supabase.auth.signOut();
@@ -166,7 +163,7 @@ class AccountActionsDialogs {
                             );
                           }
                         } catch (e) {
-                          setDialogState(() => _isDeleting = false);
+                          setDialogState(() => isDeleting = false);
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('Error: $e')),
@@ -174,7 +171,7 @@ class AccountActionsDialogs {
                           }
                         }
                       },
-                child: _isDeleting
+                child: isDeleting
                     ? const CircularProgressIndicator(color: Colors.red)
                     : const Text(
                         "Delete Account",

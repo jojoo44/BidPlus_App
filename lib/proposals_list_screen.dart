@@ -127,7 +127,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
         )
         .toList();
 
-    // ← تغيير 1: قبول مقاول واحد
     if (withScores.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No proposals with AI scores yet')),
@@ -215,10 +214,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
     const bgColor = Color(0xFF0D1219);
     const cardColor = Color(0xFF1C242F);
 
-<<<<<<< HEAD
-    // ← تغيير 2: يكفي مقاول واحد
-=======
->>>>>>> 086f55cc655c5589b5163a5a8f687542cc38e403
     final scoredCount = _proposals
         .where(
           (p) =>
@@ -226,7 +221,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
         )
         .length;
 
-    // ← تغيير 3: threshold ديناميكي من الـ RFP
     final weights = TopsisService.parseWeights(_evaluationCriteria);
     final rfpThreshold = weights.isNotEmpty
         ? TopsisService.calculateRFPThreshold(weights)
@@ -271,12 +265,8 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
             child: _buildSearchField(),
           ),
 
-<<<<<<< HEAD
-          // ← تغيير 2: يظهر الزر من مقاول واحد
+          // زر Analyze — يظهر من مقاول واحد
           if (!_isLoading && scoredCount >= 1)
-=======
-          if (!_isLoading && scoredCount >= 2)
->>>>>>> 086f55cc655c5589b5163a5a8f687542cc38e403
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 15),
               child: SizedBox(
@@ -321,12 +311,8 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
               ),
             ),
 
-<<<<<<< HEAD
-          // ← لو ما في proposals عندها scores
+          // تحذير لو ما في scores
           if (!_isLoading && scoredCount < 1 && _proposals.isNotEmpty)
-=======
-          if (!_isLoading && scoredCount < 2 && _proposals.isNotEmpty)
->>>>>>> 086f55cc655c5589b5163a5a8f687542cc38e403
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 4),
               child: Container(
@@ -497,7 +483,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
     required int rank,
     required Map<String, dynamic> proposal,
     required Color cardColor,
-    required double rfpThreshold, // ← تغيير 3: threshold ديناميكي
+    required double rfpThreshold,
   }) {
     final username = proposal['contractorname'] ?? 'Unknown';
     final rfpTitle = proposal['RFP']?['title'] ?? '—';
@@ -545,6 +531,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                 ),
               ),
             ),
+
           Padding(
             padding: const EdgeInsets.all(15),
             child: Column(
@@ -587,6 +574,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                       ),
                   ],
                 ),
+
                 const SizedBox(height: 6),
                 Row(
                   children: [
@@ -607,11 +595,9 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-<<<<<<< HEAD
 
-=======
->>>>>>> 086f55cc655c5589b5163a5a8f687542cc38e403
+                const SizedBox(height: 10),
+
                 if (hasTopsis) ...[
                   Row(
                     children: [
@@ -675,7 +661,6 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  // ← تغيير 3: يعرض الـ threshold الحقيقي للـ RFP
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -698,10 +683,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                   ),
                   const SizedBox(height: 8),
                 ],
-<<<<<<< HEAD
 
-=======
->>>>>>> 086f55cc655c5589b5163a5a8f687542cc38e403
                 if (aiInsight != null) ...[
                   Container(
                     padding: const EdgeInsets.all(10),
@@ -736,10 +718,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                   ),
                   const SizedBox(height: 8),
                 ],
-<<<<<<< HEAD
 
-=======
->>>>>>> 086f55cc655c5589b5163a5a8f687542cc38e403
                 Row(
                   children: [
                     const Icon(
@@ -768,6 +747,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                     ),
                   ],
                 ),
+
                 if (description.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
@@ -777,6 +757,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                     style: const TextStyle(color: Colors.grey, fontSize: 12),
                   ),
                 ],
+
                 const SizedBox(height: 10),
                 Container(
                   padding: const EdgeInsets.symmetric(
