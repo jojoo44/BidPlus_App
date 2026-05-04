@@ -1,6 +1,6 @@
 // active_rfp_details_screen.dart
 import 'package:flutter/material.dart';
-import 'negotiation_mng_screen.dart'; 
+import 'negotiation_mng_screen.dart';
 import 'rfp_details_screen.dart';
 import '../main.dart';
 
@@ -189,7 +189,7 @@ class _ActiveRFPDetailsScreenState extends State<ActiveRFPDetailsScreen> {
                   onPressed: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const NegotiationArchiveScreen(),
+                      builder: (_) => NegotiationArchiveScreen(),
                     ),
                   ),
                   icon: const Icon(

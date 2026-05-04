@@ -264,7 +264,7 @@ class _BidPlusState extends State<BidPlus> {
                     () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => const NegotiationArchiveScreen(),
+                        builder: (_) => NegotiationArchiveScreen(),
                       ),
                     ),
                   ),

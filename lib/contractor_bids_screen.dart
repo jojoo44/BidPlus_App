@@ -76,7 +76,8 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
       final proposalData = await supabase
           .from('proposals')
           .select('RFP, status')
-          .eq('submitterUserId', _userId!);
+          .eq('submitterUserId', _userId!)
+          .order('submissionDate', ascending: false);
 
       if (mounted) {
         setState(() {
@@ -364,16 +365,12 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
                                 color: _accent, fontSize: 12, fontWeight: FontWeight.w700)),
                             ),
                           ),
-                        IconButton(
-                          icon: Icon(Icons.tune_rounded, color: _muted),
-                          onPressed: _openFiltersSheet,
-                        ),
                       ]),
                     ),
 
                     const SizedBox(height: 12),
 
-                    // Tag chips
+                    // Tags horizontal scroll
                     SizedBox(
                       height: 36,
                       child: ListView.separated(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'verify_email_screen.dart';
 import '../main.dart';
@@ -18,9 +19,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _passwordController = TextEditingController();
   final _companyController = TextEditingController();
   final _specializationController = TextEditingController();
+  final _linkController = TextEditingController();
 
   String? _selectedTag;
   bool _isLoading = false;
+
+  List<PlatformFile> _selectedFiles = [];
+  List<String> _addedLinks = [];
 
   String? _nameError;
   String? _emailError;
@@ -28,7 +33,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
   String? _passwordError;
   String? _specializationError;
 
-  // التاقز المتاحة
   final List<Map<String, String>> _tags = [
     {'label': 'Construction', 'value': 'construction'},
     {'label': 'Engineering', 'value': 'engineering'},
@@ -48,7 +52,108 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _passwordController.dispose();
     _companyController.dispose();
     _specializationController.dispose();
+    _linkController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickFiles() async {
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: true,
+      withData: true,
+    );
+    if (result != null) {
+      setState(() => _selectedFiles.addAll(result.files));
+    }
+  }
+
+  void _showAddLinkDialog() {
+    _linkController.clear();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1D27),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Add Link', style: TextStyle(color: Colors.white)),
+        content: TextField(
+          controller: _linkController,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'https://...',
+            hintStyle: const TextStyle(color: Colors.grey),
+            filled: true,
+            fillColor: const Color(0xFF161B22),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF5D78FF),
+            ),
+            onPressed: () {
+              final link = _linkController.text.trim();
+              if (link.isNotEmpty) setState(() => _addedLinks.add(link));
+              Navigator.pop(context);
+            },
+            child: const Text('Add', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _uploadPortfolioFiles(String userId) async {
+    for (final file in _selectedFiles) {
+      if (file.bytes == null) continue;
+      final ext = file.extension ?? 'file';
+      final filePath =
+          'portfolio/$userId/${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+
+      await supabase.storage
+          .from('profiles')
+          .uploadBinary(
+            filePath,
+            file.bytes!,
+            fileOptions: FileOptions(
+              upsert: true,
+              contentType: 'application/$ext',
+            ),
+          );
+
+      final fileUrl = supabase.storage.from('profiles').getPublicUrl(filePath);
+
+      String fileType = 'file';
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext.toLowerCase())) {
+        fileType = 'image';
+      } else if (ext.toLowerCase() == 'pdf') {
+        fileType = 'pdf';
+      }
+
+      await supabase.from('ContractorPortfolio').insert({
+        'contractorId': userId,
+        'title': file.name,
+        'fileUrl': fileUrl,
+        'fileType': fileType,
+        'uploadDate': DateTime.now().toIso8601String().split('T')[0],
+      });
+    }
+
+    for (final link in _addedLinks) {
+      await supabase.from('ContractorPortfolio').insert({
+        'contractorId': userId,
+        'title': link,
+        'fileUrl': link,
+        'fileType': 'link',
+        'uploadDate': DateTime.now().toIso8601String().split('T')[0],
+      });
+    }
   }
 
   bool _validateInputs() {
@@ -97,7 +202,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       isValid = false;
     }
 
-    // للكونتراكتور فقط
     if (widget.role != 'Manager') {
       if (_specializationController.text.trim().isEmpty) {
         setState(
@@ -130,7 +234,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
       if (res.user == null) throw Exception('Signup failed. Please try again.');
 
-      // تحديث بيانات المستخدم
+      final userId = res.user!.id;
+
       final updateData = <String, dynamic>{
         'contactInfo': _phoneController.text.trim(),
       };
@@ -140,7 +245,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
         updateData['specializationTag'] = _selectedTag;
       }
 
-      await supabase.from('User').update(updateData).eq('id', res.user!.id);
+      await supabase.from('User').update(updateData).eq('id', userId);
+
+      if (widget.role != 'Manager') {
+        await _uploadPortfolioFiles(userId);
+      }
 
       if (mounted) {
         Navigator.push(
@@ -174,7 +283,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     } catch (e) {
       _showError('Something went wrong. Please try again.');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -252,9 +361,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
               _buildInput('e.g., Acme Corp.', controller: _companyController),
             ],
 
-            // ============================================
-            // قسم التخصص — للكونتراكتور فقط
-            // ============================================
             if (!isManager) ...[
               const SizedBox(height: 10),
               _buildLabel('Your Specialization'),
@@ -321,7 +427,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
               ],
 
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
@@ -332,19 +438,101 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 15),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
-                    child: _buildActionBtn(
-                      Icons.file_upload_outlined,
-                      'Upload Files',
+                    child: GestureDetector(
+                      onTap: _pickFiles,
+                      child: _buildActionBtn(
+                        Icons.file_upload_outlined,
+                        'Upload Files',
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Expanded(child: _buildActionBtn(Icons.link, 'Add Link')),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: _showAddLinkDialog,
+                      child: _buildActionBtn(Icons.link, 'Add Link'),
+                    ),
+                  ),
                 ],
               ),
+
+              if (_selectedFiles.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                ..._selectedFiles.map(
+                  (file) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.insert_drive_file,
+                          color: Color(0xFF5D78FF),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            file.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () =>
+                              setState(() => _selectedFiles.remove(file)),
+                          child: const Icon(
+                            Icons.close,
+                            color: Colors.grey,
+                            size: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+
+              if (_addedLinks.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                ..._addedLinks.map(
+                  (link) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.link,
+                          color: Color(0xFF5D78FF),
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            link,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => setState(() => _addedLinks.remove(link)),
+                          child: const Icon(
+                            Icons.close,
+                            color: Colors.grey,
+                            size: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ],
 
             const SizedBox(height: 40),
