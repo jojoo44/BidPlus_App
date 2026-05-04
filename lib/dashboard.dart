@@ -9,6 +9,7 @@ import 'active_rfp_details_screen.dart';
 import 'notifications_screen.dart';
 import 'negotiation_mng_screen.dart';
 import 'login_screen.dart';
+import 'evaluate_tab_screen.dart'; // ← إضافة
 import '../main.dart';
 
 class BidPlus extends StatefulWidget {
@@ -208,7 +209,6 @@ class _BidPlusState extends State<BidPlus> {
                 },
               ),
               const SizedBox(height: 12),
-              // ← التغيير هنا: RFPSelectorScreen بدل ProposalsListScreen
               _buildActionButton(
                 context,
                 "View All Proposals",
@@ -254,6 +254,7 @@ class _BidPlusState extends State<BidPlus> {
                 onTap: () => setState(() => selectedFilter = "Drafts"),
               ),
               const SizedBox(height: 30),
+              // ← التعديل: صارت Row بزرين
               Row(
                 children: [
                   _buildQuickAction(
@@ -265,6 +266,19 @@ class _BidPlusState extends State<BidPlus> {
                       context,
                       MaterialPageRoute(
                         builder: (_) => NegotiationArchiveScreen(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildQuickAction(
+                    context,
+                    "Evaluate",
+                    Icons.star_outline,
+                    Colors.amber,
+                    () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const EvaluateTabScreen(),
                       ),
                     ),
                   ),

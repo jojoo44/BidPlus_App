@@ -38,6 +38,7 @@ class _ContractorEvaluationScreenState
   final TextEditingController _feedbackController = TextEditingController();
   bool _isSubmitting = false;
   bool _alreadyRated = false;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -60,17 +61,22 @@ class _ContractorEvaluationScreenState
           .from('ContractorEvaluation')
           .select('evaluationId')
           .eq('contractorId', widget.contractorId)
+          .eq('rfpId', widget.rfpId)
           .eq('managerId', managerId)
           .maybeSingle();
 
-      if (existing != null && mounted) {
-        setState(() => _alreadyRated = true);
+      if (mounted) {
+        setState(() {
+          _alreadyRated = existing != null;
+          _isLoading = false;
+        });
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _submitReview() async {
-    // تحقق إن كل التقييمات مكتملة
     if (_ratings.values.any((r) => r == 0)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -88,17 +94,19 @@ class _ContractorEvaluationScreenState
       if (managerId == null) throw Exception('Not logged in');
 
       final qualityRating = _ratings['Work Quality']!.toDouble();
-      final timelinessRating =
-          ((_ratings['Communication']! + _ratings['Punctuality']!) / 2);
-      final overallScore =
-          double.parse(((_ratings.values.reduce((a, b) => a + b)) / _ratings.length)
-              .toStringAsFixed(2));
+      final communicationRating = _ratings['Communication']!.toDouble();
+      final punctualityRating = _ratings['Punctuality']!.toDouble();
+      final overallScore = double.parse(
+        ((_ratings.values.reduce((a, b) => a + b)) / _ratings.length)
+            .toStringAsFixed(2),
+      );
 
       await supabase.from('ContractorEvaluation').insert({
         'contractorId': widget.contractorId,
+        'rfpId': int.tryParse(widget.rfpId) ?? 0, // ← int8 في Supabase
         'managerId': managerId,
         'quality': qualityRating,
-        'timeliness': timelinessRating,
+        'timeliness': (communicationRating + punctualityRating) / 2,
         'overallScore': overallScore,
         'comment': _feedbackController.text.trim(),
         'created_at': DateTime.now().toIso8601String(),
@@ -112,16 +120,13 @@ class _ContractorEvaluationScreenState
             backgroundColor: Colors.green,
           ),
         );
-        await Future.delayed(const Duration(milliseconds: 800));
-        if (mounted) Navigator.pop(context);
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (mounted) Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error submitting review: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -142,157 +147,177 @@ class _ContractorEvaluationScreenState
         ),
         leading: const BackButton(color: Colors.white),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // هيدر معلومات الكونتراكتور والبروجكت
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: accentBlue.withOpacity(0.15)),
-              ),
-              child: Row(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: accentBlue))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: accentBlue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      color: surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: accentBlue.withOpacity(0.15)),
                     ),
-                    child: const Icon(Icons.person_outline,
-                        color: accentBlue, size: 28),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        Text(
-                          widget.contractorName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: accentBlue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.person_outline,
+                            color: accentBlue,
+                            size: 28,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.folder_outlined,
-                                color: textGrey, size: 13),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                widget.rfpTitle,
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                widget.contractorName,
                                 style: const TextStyle(
-                                    color: textGrey, fontSize: 12),
-                                overflow: TextOverflow.ellipsis,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.folder_outlined,
+                                    color: textGrey,
+                                    size: 13,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      widget.rfpTitle,
+                                      style: const TextStyle(
+                                        color: textGrey,
+                                        fontSize: 12,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
+
+                  if (_alreadyRated) ...[
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.green.withOpacity(0.3),
+                        ),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.check_circle_outline, color: Colors.green),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'You have already reviewed this contractor for this project.',
+                              style: TextStyle(color: Colors.green),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 24),
+                    const Text(
+                      'How was your experience?',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _buildRatingSection('Work Quality', Icons.build_outlined),
+                    _buildRatingSection(
+                      'Communication',
+                      Icons.chat_bubble_outline,
+                    ),
+                    _buildRatingSection(
+                      'Punctuality',
+                      Icons.access_time_outlined,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _feedbackController,
+                      maxLines: 4,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        hintText: 'Write your feedback here...',
+                        hintStyle: const TextStyle(color: textGrey),
+                        filled: true,
+                        fillColor: surface,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(
+                            color: accentBlue.withOpacity(0.4),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: accentBlue,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed: _isSubmitting ? null : _submitReview,
+                        child: _isSubmitting
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                'Submit Review',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 30),
                 ],
               ),
             ),
-
-            if (_alreadyRated) ...[
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green.withOpacity(0.3)),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.check_circle_outline, color: Colors.green),
-                    SizedBox(width: 10),
-                    Text(
-                      'You have already reviewed this contractor.',
-                      style: TextStyle(color: Colors.green),
-                    ),
-                  ],
-                ),
-              ),
-            ] else ...[
-              const SizedBox(height: 24),
-              const Text(
-                'How was your experience?',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              _buildRatingSection('Work Quality', Icons.build_outlined),
-              _buildRatingSection('Communication', Icons.chat_bubble_outline),
-              _buildRatingSection('Punctuality', Icons.access_time_outlined),
-
-              const SizedBox(height: 8),
-              TextField(
-                controller: _feedbackController,
-                maxLines: 4,
-                style: const TextStyle(color: Colors.white),
-                decoration: InputDecoration(
-                  hintText: 'Write your feedback here...',
-                  hintStyle: const TextStyle(color: textGrey),
-                  filled: true,
-                  fillColor: surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide:
-                        BorderSide(color: accentBlue.withOpacity(0.4)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 30),
-              SizedBox(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: accentBlue,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: _isSubmitting ? null : _submitReview,
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2),
-                        )
-                      : const Text(
-                          'Submit Review',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 30),
-          ],
-        ),
-      ),
     );
   }
 
