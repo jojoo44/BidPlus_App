@@ -190,9 +190,15 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
       _aiSuggestionText = '';
     });
     try {
+      // ✅ FIX: بعث الـ history كـ list مع role و content
       final history = _rounds
-          .map((r) => '${r['UpdateTerms']}: ${r['Terms']}')
-          .join('\n');
+          .map(
+            (r) => {
+              'role': r['UpdateTerms']?.toString() ?? '',
+              'content': r['Terms']?.toString() ?? '',
+            },
+          )
+          .toList();
 
       final response = await supabase.functions.invoke(
         'negotiate_suggest',
