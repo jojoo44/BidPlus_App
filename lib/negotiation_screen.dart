@@ -1,4 +1,6 @@
 // negotiation_screen.dart
+import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
@@ -50,11 +52,10 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
   String _aiSuggestionText      = '';
   String _sessionStatus         = 'Active';
 
-  // ── Contract state ──────────────────────────────
   String? _contractId;
   String? _firstContractUrl;
   String? _firstContractName;
-  String? _firstContractUploader; // 'manager' | 'contractor'
+  String? _firstContractUploader;
   String? _signedContractUrl;
   String? _signedContractName;
   String  _contractStatus      = '';
@@ -63,7 +64,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
 
   RealtimeChannel? _channel;
 
-  // ── Helpers ─────────────────────────────────────
   bool get _iHaveUploaded =>
       _firstContractUploader != null &&
       (widget.isManager
@@ -74,7 +74,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
   bool get _myFinalized    => widget.isManager ? _managerFinalized : _contractorFinalized;
   bool get _contractActive => _contractStatus == 'Active';
 
-  // ════════════════════════════════════════════════
   @override
   void initState() {
     super.initState();
@@ -90,7 +89,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     super.dispose();
   }
 
-  // ── Load ────────────────────────────────────────
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
@@ -163,7 +161,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     }
   }
 
-  // ── Realtime ────────────────────────────────────
   void _subscribeRealtime() {
     _channel = supabase
         .channel('nego_${widget.sessionId}')
@@ -236,7 +233,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     return id;
   }
 
-  // ── AI Suggestion ────────────────────────────────
   Future<void> _generateAISuggestion() async {
     setState(() { _isGeneratingSuggestion = true; _showAISuggestion = true; _aiSuggestionText = ''; });
     try {
@@ -254,7 +250,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     }
   }
 
-  // ── Complete negotiation → extract terms ─────────
   Future<void> _completeNegotiation() async {
     setState(() => _isGeneratingSuggestion = true);
     try {
@@ -276,7 +271,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     }
   }
 
-  // ── Send message ─────────────────────────────────
   Future<void> _sendMessage(String text) async {
     if (text.trim().isEmpty) return;
     _msgCtrl.clear();
@@ -308,23 +302,28 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     }
   }
 
-  // ── Send file (chat) ─────────────────────────────
   Future<void> _sendFile() async {
     final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom, allowedExtensions: ['pdf','doc','docx','jpg','jpeg','png'], withData: true,
+      type: FileType.custom,
+      allowedExtensions: ['pdf','doc','docx','jpg','jpeg','png'],
+      withData: kIsWeb,
     );
-    if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
+    if (result == null || result.files.isEmpty) return;
     final file = result.files.first;
+    if (kIsWeb && file.bytes == null) return;
+    if (!kIsWeb && file.path == null) return;
+
     setState(() => _isSending = true);
     try {
       final userId    = supabase.auth.currentUser?.id;
-      final path      = 'contracts/${widget.sessionId}_${widget.isManager ? "mgr" : "ctr"}_${DateTime.now().millisecondsSinceEpoch}_${file.name}';
-      await supabase.storage.from('proposal_attachments').uploadBinary(path, file.bytes!);
-      final url       = supabase.storage.from('proposal_attachments').getPublicUrl(path);
+      final path      = 'contracts/${widget.sessionId}_${widget.isManager ? "mgr" : "ctr"}_${_sanitizeFileName(file.name)}';
+      final url       = await _uploadToStorage(path, file);
       final sessionId = await _resolveSessionId();
       final Map<String, dynamic> data = {
-        'sessionID': int.tryParse(sessionId) ?? 0, 'Terms': '📎 ${file.name}',
-        'UpdateTerms': widget.isManager ? 'manager' : 'contractor', 'fileURL': url,
+        'sessionID': int.tryParse(sessionId) ?? 0,
+        'Terms': '📎 ${file.name}',
+        'UpdateTerms': widget.isManager ? 'manager' : 'contractor',
+        'fileURL': url,
       };
       if (widget.isManager)  data['manager_id']    = userId;
       if (!widget.isManager) data['contractor_id'] = userId;
@@ -338,20 +337,23 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     }
   }
 
-  // ── Upload FIRST contract ────────────────────────
   Future<void> _uploadFirstContract() async {
     final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom, allowedExtensions: ['pdf','doc','docx'], withData: true,
+      type: FileType.custom,
+      allowedExtensions: ['pdf','doc','docx'],
+      withData: kIsWeb,
     );
-    if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
+    if (result == null || result.files.isEmpty) return;
     final file = result.files.first;
+    if (kIsWeb && file.bytes == null) return;
+    if (!kIsWeb && file.path == null) return;
+
     setState(() => _isUploadingContract = true);
     try {
       final userId       = supabase.auth.currentUser!.id;
       final uploaderRole = widget.isManager ? 'manager' : 'contractor';
-      final path         = 'contracts/${widget.sessionId}_${uploaderRole}_original_${DateTime.now().millisecondsSinceEpoch}_${file.name}';
-      await supabase.storage.from('proposal_attachments').uploadBinary(path, file.bytes!);
-      final url = supabase.storage.from('proposal_attachments').getPublicUrl(path);
+      final path         = 'contracts/${widget.sessionId}_${uploaderRole}_original_${_sanitizeFileName(file.name)}';
+      final url          = await _uploadToStorage(path, file);
 
       await supabase.from('Document').insert({
         'fullName': file.name, 'fileURL': url,
@@ -392,24 +394,34 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     if (_firstContractUrl == null) return;
     try {
       final uri = Uri.parse(_firstContractUrl!);
-      if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(
+          uri,
+          mode: kIsWeb
+              ? LaunchMode.platformDefault
+              : LaunchMode.externalApplication,
+        );
+      }
     } catch (_) {}
   }
 
-  // ── Upload SIGNED contract ───────────────────────
   Future<void> _uploadSignedContract() async {
     final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom, allowedExtensions: ['pdf','doc','docx'], withData: true,
+      type: FileType.custom,
+      allowedExtensions: ['pdf','doc','docx'],
+      withData: kIsWeb,
     );
-    if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
+    if (result == null || result.files.isEmpty) return;
     final file = result.files.first;
+    if (kIsWeb && file.bytes == null) return;
+    if (!kIsWeb && file.path == null) return;
+
     setState(() => _isUploadingContract = true);
     try {
       final userId       = supabase.auth.currentUser!.id;
       final uploaderRole = widget.isManager ? 'manager' : 'contractor';
-      final path         = 'contracts/${widget.sessionId}_${uploaderRole}_signed_${DateTime.now().millisecondsSinceEpoch}_${file.name}';
-      await supabase.storage.from('proposal_attachments').uploadBinary(path, file.bytes!);
-      final url = supabase.storage.from('proposal_attachments').getPublicUrl(path);
+      final path         = 'contracts/${widget.sessionId}_${uploaderRole}_signed_${_sanitizeFileName(file.name)}';
+      final url          = await _uploadToStorage(path, file);
 
       await supabase.from('Document').insert({
         'fullName': file.name, 'fileURL': url,
@@ -431,7 +443,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     }
   }
 
-  // ── Finalize (both parties) ──────────────────────
   Future<void> _finalizeContract() async {
     if (_contractId == null) return;
     setState(() => _isUploadingContract = true);
@@ -510,9 +521,23 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     } catch (_) { return ''; }
   }
 
-  // ════════════════════════════════════════════════
-  // BUILD
-  // ════════════════════════════════════════════════
+  String _sanitizeFileName(String originalName) {
+    final parts = originalName.split('.');
+    final ext   = parts.length > 1 ? parts.last.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '') : 'pdf';
+    return '${DateTime.now().millisecondsSinceEpoch}.$ext';
+  }
+
+  Future<String> _uploadToStorage(String storagePath, PlatformFile file) async {
+    if (kIsWeb) {
+      await supabase.storage.from('proposal_attachments').uploadBinary(storagePath, file.bytes!);
+    } else {
+      final f = File(file.path!);
+      await supabase.storage.from('proposal_attachments')
+          .upload(storagePath, f, fileOptions: const FileOptions(upsert: true));
+    }
+    return supabase.storage.from('proposal_attachments').getPublicUrl(storagePath);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isCompleted = _sessionStatus == 'Completed';
@@ -532,7 +557,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
       ),
       body: Column(children: [
 
-        // ── Criteria chips ─────────────────────────
         if (widget.selectedCriteria.isNotEmpty)
           Container(
             width: double.infinity,
@@ -551,7 +575,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             ]),
           ),
 
-        // ── AI Suggestion ──────────────────────────
         if (_showAISuggestion && !isCompleted)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -597,7 +620,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             ),
           ),
 
-        // ── Generate Suggestions ───────────────────
         if (!isCompleted)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -615,14 +637,11 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             ),
           ),
 
-        // ── Contract section ───────────────────────
         _buildContractSection(),
 
-        // ── Active banner ──────────────────────────
         if (_contractActive)
           _buildBanner(Icons.check_circle, Colors.greenAccent, '🎉 Contract active! Project is now running.'),
 
-        // ── Messages ──────────────────────────────
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator(color: primaryBlue))
@@ -645,7 +664,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                       }),
         ),
 
-        // ── Input bar ─────────────────────────────
         if (!isCompleted && !_contractActive)
           Container(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 16), color: surface,
@@ -671,15 +689,10 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                         onPressed: () => _sendMessage(_msgCtrl.text))),
             ]),
           ),
-
-
       ]),
     );
   }
 
-  // ════════════════════════════════════════════════
-  // CONTRACT SECTION
-  // ════════════════════════════════════════════════
   Widget _buildContractSection() {
     // State 1 — no contract yet
     if (_firstContractUrl == null) {
@@ -737,7 +750,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
       );
     }
 
-    // State 3 — other uploaded, I need to download + sign + re-upload
+    // State 3 — other uploaded, I download + sign + re-upload
     if (_otherUploaded && !_signedUploaded) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -752,7 +765,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                   style: TextStyle(color: Colors.lightBlueAccent, fontWeight: FontWeight.w700)),
             ]),
             const SizedBox(height: 10),
-            // Saved file box with download button
             GestureDetector(
               onTap: _downloadContract,
               child: Container(
@@ -799,26 +811,25 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           decoration: BoxDecoration(color: Colors.green.withOpacity(0.08), borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.green.withOpacity(0.3))),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Original
             if (_firstContractUrl != null) ...[
               const Text('Original Contract', style: TextStyle(color: Colors.white38, fontSize: 11)),
               const SizedBox(height: 4),
-              GestureDetector(onTap: _downloadContract, child: _fileBox(_firstContractName ?? 'Contract', Colors.white54, showDownload: true)),
+              GestureDetector(onTap: _downloadContract,
+                  child: _fileBox(_firstContractName ?? 'Contract', Colors.white54, showDownload: true)),
               const SizedBox(height: 10),
             ],
-            // Signed
             const Text('Signed Copy', style: TextStyle(color: Colors.greenAccent, fontSize: 11)),
             const SizedBox(height: 4),
             GestureDetector(
               onTap: () async {
                 if (_signedContractUrl == null) return;
                 final uri = Uri.parse(_signedContractUrl!);
-                if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+                if (await canLaunchUrl(uri)) await launchUrl(uri,
+                    mode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication);
               },
               child: _fileBox(_signedContractName ?? 'Signed Contract', Colors.greenAccent, showDownload: true),
             ),
             const Divider(color: Colors.white12, height: 20),
-            // Who finalized
             Row(children: [
               _finalizeChip('Manager',    _managerFinalized),
               const SizedBox(width: 8),
@@ -888,9 +899,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
   );
 }
 
-// ════════════════════════════════════════════════════
-// Chat Bubble
-// ════════════════════════════════════════════════════
 class _ChatBubble extends StatelessWidget {
   final String text, time, label;
   final bool isMe;
@@ -939,9 +947,6 @@ class _ChatBubble extends StatelessWidget {
   }
 }
 
-// ════════════════════════════════════════════════════
-// AIContractReviewScreen
-// ════════════════════════════════════════════════════
 class AIContractReviewScreen extends StatefulWidget {
   final String contractorName, proposalId, finalPrice, duration, terms;
   const AIContractReviewScreen({super.key, required this.contractorName, required this.proposalId,
