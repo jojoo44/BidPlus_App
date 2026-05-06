@@ -80,9 +80,9 @@ class _ManagerProposalDetailsScreenState
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Cannot open file')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Cannot open file')),
+        );
       }
     }
   }
@@ -100,25 +100,30 @@ class _ManagerProposalDetailsScreenState
           .update({'status': newStatus})
           .eq('ProposalID', proposalId);
 
+      // ── FIX: استخدام maybeSingle() بدل single() لتجنب خطأ 406 ──
       if (newStatus == 'Accepted' && rfpId != null) {
-        // ✅ احذف أي session قديمة ثم أضف جديدة نظيفة — يضمن عدم التكرار
-        await supabase
+        final existing = await supabase
             .from('NegoSession')
-            .delete()
-            .eq('rfp_id', rfpId.toString());
+            .select('session_id')
+            .eq('rfp_id', rfpId.toString())
+            .maybeSingle();
 
-        await supabase.from('NegoSession').insert({
-          'status': 'Active',
-          'start_date': DateTime.now().toIso8601String(),
-          'rfp_id': rfpId.toString(),
-        });
+        if (existing == null) {
+          await supabase.from('NegoSession').insert({
+            'status': 'Active',
+            'start_date': DateTime.now().toIso8601String(),
+            'rfp_id': rfpId.toString(),
+          });
+        }
       }
 
       if (contractorId != null) {
+        // ── FIX: maybeSingle() بدل single() لتجنب 406 عند تعدد الصفوف ──
         final contractorData = await supabase
             .from('User')
             .select('notificationsEnabled')
             .eq('id', contractorId)
+            .limit(1)
             .maybeSingle();
 
         if (contractorData != null &&
@@ -149,24 +154,48 @@ class _ManagerProposalDetailsScreenState
       widget.onStatusChanged();
 
       if (mounted) {
+        // ── ألوان الـ Snackbar حسب الحالة ──
+        Color snackColor;
+        String snackMsg;
+        if (newStatus == 'Accepted') {
+          snackColor = Colors.green;
+          snackMsg = '✅ Proposal accepted & negotiation started!';
+        } else if (newStatus == 'Rejected') {
+          snackColor = Colors.red;
+          snackMsg = '❌ Proposal rejected.';
+        } else if (newStatus == 'Submitted') {
+          snackColor = blue;
+          snackMsg = '🔄 Proposal reset to Submitted';
+        } else {
+          snackColor = blue;
+          snackMsg = 'Proposal updated to $newStatus';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              newStatus == 'Accepted'
-                  ? '✅ Proposal accepted & negotiation started!'
-                  : 'Proposal updated to $newStatus',
+              snackMsg,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
             ),
-            backgroundColor: newStatus == 'Accepted'
-                ? Colors.green
-                : Colors.red,
+            backgroundColor: snackColor,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -255,7 +284,7 @@ class _ManagerProposalDetailsScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Status Banner
+            // ── FIX: Status Banner - إصلاح الـ Overflow ──
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -266,55 +295,81 @@ class _ManagerProposalDetailsScreenState
                   color: _statusColor(_status).withOpacity(0.3),
                 ),
               ),
-              child: Row(
-                children: [
-                  Icon(_statusIcon(_status), color: _statusColor(_status)),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Status: $_status',
-                    style: TextStyle(
-                      color: _statusColor(_status),
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
-                    ),
-                  ),
-                  if (_status.toLowerCase() == 'accepted') ...[
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.purple.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.purple.withOpacity(0.4),
+              child: _status.toLowerCase() == 'accepted'
+                  // ── إذا accepted: عمود بدل Row لتجنب الـ overflow ──
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              _statusIcon(_status),
+                              color: _statusColor(_status),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Status: $_status',
+                              style: TextStyle(
+                                color: _statusColor(_status),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.handshake_outlined,
-                            color: Colors.purple,
-                            size: 14,
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
                           ),
-                          SizedBox(width: 4),
-                          Text(
-                            'Negotiation Active',
-                            style: TextStyle(
-                              color: Colors.purple,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
+                          decoration: BoxDecoration(
+                            color: Colors.purple.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.purple.withOpacity(0.4),
                             ),
                           ),
-                        ],
-                      ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.handshake_outlined,
+                                color: Colors.purple,
+                                size: 14,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                'Negotiation Active',
+                                style: TextStyle(
+                                  color: Colors.purple,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    )
+                  // ── باقي الحالات: Row عادي ──
+                  : Row(
+                      children: [
+                        Icon(
+                          _statusIcon(_status),
+                          color: _statusColor(_status),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Status: $_status',
+                          style: TextStyle(
+                            color: _statusColor(_status),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ],
-              ),
             ),
 
             const SizedBox(height: 20),
@@ -420,9 +475,7 @@ class _ManagerProposalDetailsScreenState
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: _fileColor(
-                                    uploadType,
-                                  ).withOpacity(0.1),
+                                  color: _fileColor(uploadType).withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Icon(
@@ -638,21 +691,26 @@ class _ManagerProposalDetailsScreenState
                 ),
               ),
             ] else ...[
+              // ── FIX: زر Reset to Submitted - لون أزرق جميل ──
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.grey.shade600),
-                    foregroundColor: Colors.grey,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: blue.withOpacity(0.15),
+                    foregroundColor: blue,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: blue.withOpacity(0.5)),
                     ),
+                    elevation: 0,
                   ),
-                  onPressed: _isLoading
-                      ? null
-                      : () => _updateStatus('Submitted'),
-                  child: const Text('Reset to Submitted'),
+                  onPressed: _isLoading ? null : () => _updateStatus('Submitted'),
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text(
+                    'Reset to Submitted',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
                 ),
               ),
             ],
