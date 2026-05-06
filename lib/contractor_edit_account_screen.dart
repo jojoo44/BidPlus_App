@@ -50,6 +50,7 @@ class _ContractorEditAccountScreenState
     super.dispose();
   }
 
+  // ✅ FIX: maybeSingle() بدل single()
   Future<void> _loadProfile() async {
     try {
       final user = supabase.auth.currentUser;
@@ -60,7 +61,13 @@ class _ContractorEditAccountScreenState
             'username, contactInfo, specialization, specializationTag, photoUrl',
           )
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
+
+      if (data == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
       setState(() {
         _email = user.email ?? '';
         _nameController.text = data['username'] ?? '';
@@ -172,7 +179,6 @@ class _ContractorEditAccountScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // صورة البروفايل
                   Center(
                     child: Column(
                       children: [

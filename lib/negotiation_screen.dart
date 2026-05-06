@@ -236,11 +236,36 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
   Future<void> _generateAISuggestion() async {
     setState(() { _isGeneratingSuggestion = true; _showAISuggestion = true; _aiSuggestionText = ''; });
     try {
-      final history = _rounds.map((r) => '${r['UpdateTerms']}: ${r['Terms']}').join('\n');
+      // بناء سياق أفضل للمحversation
+      final history = _rounds.map((r) {
+        final role = r['UpdateTerms'] == 'Client' ? 'المدير' : 'المقاول';
+        return '$role: ${r['Terms']}';
+      }).join('\n');
+
+      // إضافة context إضافي للـ AI
+      final context = '''
+المشروع: ${widget.rfpTitle}
+الميزانية: ${widget.budget ?? 'غير محددة'}
+المعايير: ${widget.selectedCriteria.join(', ')}
+
+سجل التفاوض:
+$history
+
+نوع المستخدم: ${widget.isManager ? 'مدير مشروع' : 'مقاول'}
+''';
+
       final res = await supabase.functions.invoke('negotiate_suggest', body: {
-        'title': widget.rfpTitle, 'budget': widget.budget?.toString() ?? '',
-        'history': history, 'criteria': widget.selectedCriteria.join(', '),
+        'title': widget.rfpTitle,
+        'budget': widget.budget?.toString() ?? '',
+        'history': context,
+        'criteria': widget.selectedCriteria.join(', '),
         'isManager': widget.isManager,
+        // إضافة معايير الجودة
+        'requirements': {
+          'be_professional': true,
+          'be_specific': true,
+          'consider_budget': widget.budget != null,
+        }
       });
       if (mounted) setState(() => _aiSuggestionText = res.data['suggestion']?.toString() ?? '');
     } catch (e) {

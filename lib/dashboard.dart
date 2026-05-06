@@ -9,7 +9,7 @@ import 'active_rfp_details_screen.dart';
 import 'notifications_screen.dart';
 import 'negotiation_mng_screen.dart';
 import 'login_screen.dart';
-import 'evaluate_tab_screen.dart'; // ← إضافة
+import 'evaluate_tab_screen.dart';
 import '../main.dart';
 
 class BidPlus extends StatefulWidget {
@@ -44,6 +44,7 @@ class _BidPlusState extends State<BidPlus> {
     super.dispose();
   }
 
+  // ✅ FIX: maybeSingle() بدل single()
   Future<void> _checkAuth() async {
     final user = supabase.auth.currentUser;
     if (user == null) {
@@ -58,7 +59,10 @@ class _BidPlusState extends State<BidPlus> {
         .from('User')
         .select('role, username')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
+
+    if (data == null) return;
+
     if (data['role'] != 'manager' && mounted) {
       Navigator.pushReplacement(
         context,
@@ -254,7 +258,6 @@ class _BidPlusState extends State<BidPlus> {
                 onTap: () => setState(() => selectedFilter = "Drafts"),
               ),
               const SizedBox(height: 30),
-              // ← التعديل: صارت Row بزرين
               Row(
                 children: [
                   _buildQuickAction(

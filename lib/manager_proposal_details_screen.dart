@@ -38,7 +38,6 @@ class _ManagerProposalDetailsScreenState
     _loadDocuments();
   }
 
-  // ── جلب ملفات المقاول ──────────────────────────────────────────────────────
   Future<void> _loadDocuments() async {
     try {
       final proposalId = widget.proposal['ProposalID'];
@@ -102,19 +101,17 @@ class _ManagerProposalDetailsScreenState
           .eq('ProposalID', proposalId);
 
       if (newStatus == 'Accepted' && rfpId != null) {
-        final existing = await supabase
+        // ✅ احذف أي session قديمة ثم أضف جديدة نظيفة — يضمن عدم التكرار
+        await supabase
             .from('NegoSession')
-            .select('session_id')
-            .eq('rfp_id', rfpId.toString())
-            .maybeSingle();
+            .delete()
+            .eq('rfp_id', rfpId.toString());
 
-        if (existing == null) {
-          await supabase.from('NegoSession').insert({
-            'status': 'Active',
-            'start_date': DateTime.now().toIso8601String(),
-            'rfp_id': rfpId.toString(),
-          });
-        }
+        await supabase.from('NegoSession').insert({
+          'status': 'Active',
+          'start_date': DateTime.now().toIso8601String(),
+          'rfp_id': rfpId.toString(),
+        });
       }
 
       if (contractorId != null) {
@@ -376,7 +373,7 @@ class _ManagerProposalDetailsScreenState
 
             const SizedBox(height: 16),
 
-            // ── Submitted Documents ──────────────────────────────────────────
+            // Submitted Documents
             _sectionTitle('Submitted Documents'),
             Container(
               padding: const EdgeInsets.all(16),
