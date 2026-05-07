@@ -172,16 +172,15 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'NegoRounds',
-          // ── filter مباشر على sessionID لضمان المزامنة الفورية ──
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'sessionID',
-            value: sidInt,
-          ),
           callback: (p) {
             final row = p.newRecord;
             if (!mounted) return;
-            // ── تجنب إضافة رسالة مكررة ──
+            // تحقق من الـ sessionID
+            final rowSid = row['sessionID']?.toString();
+            final match = rowSid == widget.sessionId ||
+                rowSid == sidInt.toString();
+            if (!match) return;
+            // تجنب التكرار
             final roundId = row['roundID']?.toString();
             final exists = _rounds.any((r) => r['roundID']?.toString() == roundId);
             if (!exists) {
@@ -912,7 +911,13 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _fileBox(_firstContractName ?? 'Contract', Colors.amber),
+              // ── FIX: الملف قابل للضغط ──
+              GestureDetector(
+                onTap: () async {
+                  if (_firstContractUrl != null) await _openUrl(_firstContractUrl!);
+                },
+                child: _fileBox(_firstContractName ?? 'Contract', Colors.amber, showDownload: true),
+              ),
               const SizedBox(height: 10),
               const Row(children: [
                 Icon(Icons.hourglass_top, color: Colors.amber, size: 15), SizedBox(width: 6),
