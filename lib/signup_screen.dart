@@ -23,6 +23,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   String? _selectedTag;
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
   List<PlatformFile> _selectedFiles = [];
   List<String> _addedLinks = [];
@@ -588,7 +589,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     children: [
       TextField(
         controller: controller,
-        obscureText: isPass,
+        obscureText: isPass ? _obscurePassword : false,
         keyboardType: keyboardType,
         style: const TextStyle(color: Colors.white),
         onChanged: (_) => setState(() {
@@ -603,6 +604,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
           hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
           filled: true,
           fillColor: const Color(0xFF161B22),
+          suffixIcon: isPass
+              ? IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                    color: Colors.grey,
+                  ),
+                  onPressed: () =>
+                      setState(() => _obscurePassword = !_obscurePassword),
+                )
+              : null,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: errorText != null
