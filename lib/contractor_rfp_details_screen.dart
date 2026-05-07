@@ -325,8 +325,9 @@ Future<Map<String, dynamic>> _computeAiScoreWithDetails({
   required String evaluationCriteria,
 }) async {
   try {
-    if (evaluationCriteria.isEmpty)
+    if (evaluationCriteria.isEmpty) {
       return {'finalScore': 0, 'criteriaScores': <String, int>{}};
+    }
 
     final weights = <String, double>{};
     for (final part in evaluationCriteria.split(',')) {
@@ -338,8 +339,9 @@ Future<Map<String, dynamic>> _computeAiScoreWithDetails({
         if (weight > 0) weights[name] = weight;
       }
     }
-    if (weights.isEmpty)
+    if (weights.isEmpty) {
       return {'finalScore': 0, 'criteriaScores': <String, int>{}};
+    }
 
     final criteriaScores = <String, int>{};
     double total = 0;
@@ -438,8 +440,9 @@ class _ContractorRFPDetailsScreenState
       if (mounted) {
         setState(() {
           _hasSubmitted = list.isNotEmpty;
-          if (list.isNotEmpty)
+          if (list.isNotEmpty) {
             _submittedProposal = Map<String, dynamic>.from(list.first);
+          }
         });
       }
     } catch (_) {}
@@ -495,10 +498,11 @@ class _ContractorRFPDetailsScreenState
         return;
       }
     }
-    if (mounted)
+    if (mounted) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Cannot open file')));
+    }
   }
 
   void _showSubmitProposalSheet() {
@@ -564,10 +568,11 @@ class _ContractorRFPDetailsScreenState
               }
               setSheetState(() {});
             } catch (e) {
-              if (mounted)
+              if (mounted) {
                 ScaffoldMessenger.of(
                   context,
                 ).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+              }
             } finally {
               setSheetState(() {
                 isUploadingFile = false;

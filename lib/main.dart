@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'login_screen.dart';
 import 'welcome_screen.dart';
 
 final supabase = Supabase.instance.client;

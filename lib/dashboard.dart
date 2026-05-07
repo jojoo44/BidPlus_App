@@ -48,11 +48,12 @@ class _BidPlusState extends State<BidPlus> {
   Future<void> _checkAuth() async {
     final user = supabase.auth.currentUser;
     if (user == null) {
-      if (mounted)
+      if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const LoginScreen()),
         );
+      }
       return;
     }
     final data = await supabase

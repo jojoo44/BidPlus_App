@@ -48,11 +48,12 @@ class _ContractorDashboardScreenState
   Future<void> _checkAuth() async {
     final user = supabase.auth.currentUser;
     if (user == null) {
-      if (mounted)
+      if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const LoginScreen()),
         );
+      }
       return;
     }
     final data = await supabase
@@ -147,16 +148,18 @@ class _ContractorDashboardScreenState
     try {
       dynamic query =
           supabase.from('RFP').select().eq('status', 'Published');
-      if (_userTag != null && _userTag!.isNotEmpty)
+      if (_userTag != null && _userTag!.isNotEmpty) {
         query =
             query.or('requiredTag.eq.$_userTag,requiredTag.is.null');
+      }
       final data =
           await query.order('creationDate', ascending: false);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _publishedRFPs = List<Map<String, dynamic>>.from(data);
           _isLoadingRFPs = false;
         });
+      }
     } catch (e) {
       if (mounted) setState(() => _isLoadingRFPs = false);
     }
@@ -171,8 +174,9 @@ class _ContractorDashboardScreenState
           .select('notificationID')
           .eq('userID', userId)
           .eq('readStatus', false);
-      if (mounted)
+      if (mounted) {
         setState(() => _unreadCount = (data as List).length);
+      }
     } catch (_) {}
   }
 
@@ -383,7 +387,7 @@ class _ContractorDashboardScreenState
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         itemCount: _currentProjects.length,
-                        separatorBuilder: (_, __) =>
+                        separatorBuilder: (_, _) =>
                             const SizedBox(width: 14),
                         itemBuilder: (_, i) {
                           final project = _currentProjects[i];

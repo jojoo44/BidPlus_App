@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'qualified_contractors_screen.dart';
 import 'topsis_service.dart';
 import '../main.dart';

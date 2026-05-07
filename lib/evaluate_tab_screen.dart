@@ -41,11 +41,12 @@ class _EvaluateTabScreenState extends State<EvaluateTabScreen> {
 
       final rfpIds = (rfpData as List).map((r) => r['rfpID'] as int).toList();
       if (rfpIds.isEmpty) {
-        if (mounted)
+        if (mounted) {
           setState(() {
             _sessions = [];
             _isLoading = false;
           });
+        }
         return;
       }
 
@@ -57,11 +58,12 @@ class _EvaluateTabScreenState extends State<EvaluateTabScreen> {
           .order('start_date', ascending: false);
 
       if ((sessionsData as List).isEmpty) {
-        if (mounted)
+        if (mounted) {
           setState(() {
             _sessions = [];
             _isLoading = false;
           });
+        }
         return;
       }
 
@@ -143,10 +145,12 @@ class _EvaluateTabScreenState extends State<EvaluateTabScreen> {
   }
 
   List<Map<String, dynamic>> get _filtered {
-    if (_filter == 'pending')
+    if (_filter == 'pending') {
       return _sessions.where((s) => !(s['reviewed'] as bool)).toList();
-    if (_filter == 'done')
+    }
+    if (_filter == 'done') {
       return _sessions.where((s) => s['reviewed'] as bool).toList();
+    }
     return _sessions;
   }
 

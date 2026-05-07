@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'create_rfp_screen.dart';
 import 'review_publish_screen.dart';
 import '../main.dart';

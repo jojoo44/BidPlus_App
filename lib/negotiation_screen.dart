@@ -194,11 +194,13 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           schema: 'public', table: 'Contract',
           callback: (p) {
             final row = p.newRecord;
-            if (mounted) setState(() {
+            if (mounted) {
+              setState(() {
               _contractStatus      = row['status'] ?? _contractStatus;
               _managerFinalized    = row['manager_finalized'] == true;
               _contractorFinalized = row['contractor_finalized'] == true;
             });
+            }
           },
         )
         .onPostgresChanges(
@@ -505,10 +507,12 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     try {
       final field = widget.isManager ? 'manager_finalized' : 'contractor_finalized';
       await supabase.from('Contract').update({field: true}).eq('id', _contractId!);
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         if (widget.isManager)  _managerFinalized    = true;
         if (!widget.isManager) _contractorFinalized = true;
       });
+      }
 
       final c = await supabase.from('Contract')
           .select('manager_finalized,contractor_finalized').eq('id', _contractId!).single();
@@ -522,10 +526,12 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         }).eq('session_id', sid);
         await _notifyOtherParty('Contract Active',
             'The contract for "${widget.rfpTitle}" is finalized by both parties. Project is now active!');
-        if (mounted) setState(() {
+        if (mounted) {
+          setState(() {
           _contractStatus = 'Active'; _sessionStatus = 'Completed';
           _managerFinalized = true; _contractorFinalized = true;
         });
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('🎉 Contract finalized! Project is now active.'), backgroundColor: Colors.green),

@@ -25,8 +25,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
-  List<PlatformFile> _selectedFiles = [];
-  List<String> _addedLinks = [];
+  final List<PlatformFile> _selectedFiles = [];
+  final List<String> _addedLinks = [];
 
   String? _nameError;
   String? _emailError;

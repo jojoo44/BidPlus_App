@@ -31,11 +31,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           .select()
           .eq('userID', userId)
           .order('timeStamp', ascending: false);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _notifications = List<Map<String, dynamic>>.from(data);
           _isLoading = false;
         });
+      }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }

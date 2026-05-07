@@ -181,7 +181,7 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
   void _onTapRFP(Map<String, dynamic> rfp) {
     final rfpId = rfp['rfpID'].toString();
     final pStatus = _proposalStatus(rfpId);
-    final _accent = _statusColor(pStatus);
+    final accent = _statusColor(pStatus);
 
     showModalBottomSheet(
       context: context,
@@ -207,15 +207,15 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: _accent.withOpacity(0.15),
+                  color: accent.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: _accent.withOpacity(0.4)),
+                  border: Border.all(color: accent.withOpacity(0.4)),
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(_statusIcon(pStatus), color: _accent, size: 14),
+                  Icon(_statusIcon(pStatus), color: accent, size: 14),
                   const SizedBox(width: 5),
                   Text(_statusLabel(pStatus),
-                      style: TextStyle(color: _accent, fontSize: 12, fontWeight: FontWeight.w800)),
+                      style: TextStyle(color: accent, fontSize: 12, fontWeight: FontWeight.w800)),
                 ]),
               ),
             ]),
@@ -225,9 +225,9 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: _accent.withOpacity(0.1), borderRadius: BorderRadius.circular(20),
+                  color: accent.withOpacity(0.1), borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text(rfp['requiredTag'], style: TextStyle(color: _accent, fontSize: 12)),
+                child: Text(rfp['requiredTag'], style: TextStyle(color: accent, fontSize: 12)),
               ),
             const SizedBox(height: 8),
             _detailRow(Icons.payments_rounded, 'Budget',
@@ -241,7 +241,7 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
                 width: double.infinity, height: 50,
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _accent, foregroundColor: Colors.black,
+                    backgroundColor: accent, foregroundColor: Colors.black,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   onPressed: () {
@@ -259,14 +259,14 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: _accent.withOpacity(0.08), borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: _accent.withOpacity(0.3)),
+                  color: accent.withOpacity(0.08), borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: accent.withOpacity(0.3)),
                 ),
                 child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Icon(_statusIcon(pStatus), color: _accent, size: 18),
+                  Icon(_statusIcon(pStatus), color: accent, size: 18),
                   const SizedBox(width: 8),
                   Text('Proposal ${_statusLabel(pStatus)}',
-                      style: TextStyle(color: _accent, fontWeight: FontWeight.w700, fontSize: 14)),
+                      style: TextStyle(color: accent, fontWeight: FontWeight.w700, fontSize: 14)),
                 ]),
               ),
           ],
@@ -376,7 +376,7 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         itemCount: kTags.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
                         itemBuilder: (_, i) {
                           final t = kTags[i];
                           final selected = (_filters.tag ?? '') == t['value'];
