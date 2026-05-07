@@ -37,41 +37,53 @@ class _ContractorNegotiationScreenState
     setState(() => _isLoading = true);
     try {
       final sessionIdInt = int.tryParse(sessionId) ?? sessionId;
+
+      // ✅ FIX 1: maybeSingle() بدل single()
       final sessionData = await supabase
           .from('NegoSession')
           .select()
           .eq('session_id', sessionIdInt)
-          .single();
+          .maybeSingle();
+
+      if (sessionData == null) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
 
       final rfpId = sessionData['rfp_id']?.toString() ?? '';
       String rfpTitle = '—', managerName = '—', proposalId = '';
       List<String> criteria = [];
 
       try {
+        // ✅ FIX 2: maybeSingle() بدل single()
         final rfp = await supabase
             .from('RFP')
             .select('title, creatorUser, evaluationCriteria')
             .eq('rfpID', rfpId)
-            .single();
-        rfpTitle = rfp['title'] ?? '—';
+            .maybeSingle();
 
-        final manager = await supabase
-            .from('User')
-            .select('username')
-            .eq('id', rfp['creatorUser'])
-            .single();
-        managerName = manager['username'] ?? '—';
+        if (rfp != null) {
+          rfpTitle = rfp['title'] ?? '—';
 
-        final raw = rfp['evaluationCriteria'] as String?;
-        if (raw != null && raw.isNotEmpty) {
-          criteria = raw
-              .split(',')
-              .map((p) {
-                final idx = p.indexOf(':');
-                return idx == -1 ? p.trim() : p.substring(0, idx).trim();
-              })
-              .where((c) => c.isNotEmpty)
-              .toList();
+          // ✅ FIX 3: maybeSingle() بدل single()
+          final manager = await supabase
+              .from('User')
+              .select('username')
+              .eq('id', rfp['creatorUser'])
+              .maybeSingle();
+          managerName = manager?['username'] ?? '—';
+
+          final raw = rfp['evaluationCriteria'] as String?;
+          if (raw != null && raw.isNotEmpty) {
+            criteria = raw
+                .split(',')
+                .map((p) {
+                  final idx = p.indexOf(':');
+                  return idx == -1 ? p.trim() : p.substring(0, idx).trim();
+                })
+                .where((c) => c.isNotEmpty)
+                .toList();
+          }
         }
       } catch (_) {}
 
@@ -111,8 +123,6 @@ class _ContractorNegotiationScreenState
     try {
       if (_contractorId == null) return;
 
-      // ← الجديد: جيب الـ sessions مباشرة بـ contractor_id
-      // بدل ما نمر على proposals بـ status='Accepted'
       final sessionsData = await supabase
           .from('NegoSession')
           .select()
@@ -140,17 +150,21 @@ class _ContractorNegotiationScreenState
       for (final session in sessionsData) {
         final rfpId = session['rfp_id'];
         try {
+          // ✅ FIX 4: maybeSingle() بدل single()
           final rfp = await supabase
               .from('RFP')
               .select('title, creatorUser, evaluationCriteria')
               .eq('rfpID', rfpId)
-              .single();
+              .maybeSingle();
 
-          final manager = await supabase
-              .from('User')
-              .select('username')
-              .eq('id', rfp['creatorUser'])
-              .single();
+          // ✅ FIX 5: maybeSingle() بدل single()
+          final manager = rfp != null
+              ? await supabase
+                    .from('User')
+                    .select('username')
+                    .eq('id', rfp['creatorUser'])
+                    .maybeSingle()
+              : null;
 
           final lastMsg = await supabase
               .from('NegoRounds')
@@ -160,7 +174,7 @@ class _ContractorNegotiationScreenState
               .limit(1)
               .maybeSingle();
 
-          final raw = rfp['evaluationCriteria'] as String?;
+          final raw = rfp?['evaluationCriteria'] as String?;
           List<String> criteria = [];
           if (raw != null && raw.isNotEmpty) {
             criteria = raw
@@ -173,7 +187,6 @@ class _ContractorNegotiationScreenState
                 .toList();
           }
 
-          // جيب الـ proposalId
           String proposalId = '';
           try {
             final proposal = await supabase
@@ -187,8 +200,8 @@ class _ContractorNegotiationScreenState
 
           enriched.add({
             ...session,
-            'rfpTitle': rfp['title'] ?? '—',
-            'managerName': manager['username'] ?? '—',
+            'rfpTitle': rfp?['title'] ?? '—',
+            'managerName': manager?['username'] ?? '—',
             'criteria': criteria,
             'proposalId': proposalId,
             'lastMessage': lastMsg?['Terms'] ?? 'No messages yet',

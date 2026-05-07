@@ -58,7 +58,6 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
   List<Map<String, String>> criteriaList = [];
   List<TextEditingController> weightControllers = [];
 
-  // ── AHP: هل تم حساب الأوزان؟ ──
   bool _ahpApplied = false;
   double? _lastCR;
 
@@ -128,7 +127,6 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
     super.dispose();
   }
 
-  // ── فتح AHP Dialog ──
   Future<void> _openAHPDialog() async {
     if (criteriaList.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -145,9 +143,8 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
       builder: (_) => AHPDialog(criteria: names),
     );
 
-    if (result == null) return; // المستخدم أغلق بدون تأكيد
+    if (result == null) return;
 
-    // طبّق الأوزان على الـ controllers
     final percents = AHPCalculator.weightsToPercent(result.values.toList());
     setState(() {
       for (int i = 0; i < criteriaList.length; i++) {
@@ -298,6 +295,7 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
           Navigator.pop(context);
         }
       } else {
+        // ✅ FIX: maybeSingle() بدل single()
         final newRfp = await supabase
             .from('RFP')
             .insert({
@@ -307,7 +305,11 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
               'creationDate': DateTime.now().toIso8601String().split('T')[0],
             })
             .select('rfpID')
-            .single();
+            .maybeSingle();
+
+        if (newRfp == null) {
+          throw Exception('Failed to create RFP');
+        }
 
         for (int i = 0; i < _pickedFiles.length; i++) {
           await supabase.from('Document').insert({
@@ -439,12 +441,10 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
 
             const SizedBox(height: 20),
 
-            // ── Evaluation Criteria Header ──
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _buildLabel('Evaluation Criteria'),
-                // ── زر AHP ──
                 GestureDetector(
                   onTap: _openAHPDialog,
                   child: Container(
@@ -489,7 +489,6 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
               ],
             ),
 
-            // إشعار لو AHP مطبق
             if (_ahpApplied)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
