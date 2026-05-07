@@ -1,3 +1,4 @@
+// role_selection_screen.dart
 import 'package:flutter/material.dart';
 import 'signup_screen.dart';
 
@@ -9,7 +10,6 @@ class RoleSelectionScreen extends StatefulWidget {
 }
 
 class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
-  // هذا المتغير عشان نعرف وش اختار المستخدم (Contractor أو Manager)
   String selectedRole = "Contractor";
 
   @override
@@ -42,24 +42,12 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
             ),
             const SizedBox(height: 40),
 
-            // بطاقة المدير
-            _roleCard(
-              "Manager",
-              "Create projects and assign tasks",
-              Icons.person_outline,
-            ),
+            _roleCard("Manager", "Create projects and assign tasks", Icons.person_outline),
             const SizedBox(height: 20),
-
-            // بطاقة المقاول
-            _roleCard(
-              "Contractor",
-              "View tasks and update progress",
-              Icons.build_outlined,
-            ),
+            _roleCard("Contractor", "View tasks and update progress", Icons.build_outlined),
 
             const Spacer(),
 
-            // زر المتابعة
             SizedBox(
               width: double.infinity,
               height: 55,
@@ -71,8 +59,6 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                   ),
                 ),
                 onPressed: () {
-                  print("Selected Role: $selectedRole");
-                  // هنا بنربطها بصفحة التسجيل التفصيلية في الخطوة الجاية
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -82,11 +68,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 },
                 child: const Text(
                   "Continue",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -114,24 +96,26 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
           children: [
             Icon(icon, color: Colors.white, size: 30),
             const SizedBox(width: 15),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
+            // ── FIX: Expanded يمنع الـ overflow ──
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
                   ),
-                ),
-                Text(
-                  sub,
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              ],
+                  Text(
+                    sub,
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                ],
+              ),
             ),
-            const Spacer(),
             if (isMe) const Icon(Icons.check_circle, color: Color(0xFF5D78FF)),
           ],
         ),
