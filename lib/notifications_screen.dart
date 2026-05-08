@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'rfp_details_screen.dart';
 import 'proposals_list_screen.dart';
 import 'negotiation_mng_screen.dart';
