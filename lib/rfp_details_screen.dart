@@ -33,13 +33,11 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
           .select()
           .eq('rfpID', widget.rfpId)
           .single();
-
-      if (mounted) {
+      if (mounted)
         setState(() {
           _rfp = data;
           _isLoading = false;
         });
-      }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
       ScaffoldMessenger.of(
@@ -55,7 +53,6 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
           .from('RFP')
           .update({'status': 'Cancelled'})
           .eq('rfpID', widget.rfpId);
-
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -253,16 +250,22 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.green.withOpacity(0.3)),
         ),
-        child: const Row(
+        // ✅ الإصلاح: Flexible عشان النص ما يطلع خارج الـ frame
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.check_circle, color: Colors.green),
-            SizedBox(width: 8),
-            Text(
-              'RFP is Published — Visible to Contractors',
-              style: TextStyle(
-                color: Colors.green,
-                fontWeight: FontWeight.w600,
+            const Icon(Icons.check_circle, color: Colors.green, size: 20),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                'RFP is Published — Visible to Contractors',
+                style: const TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
               ),
             ),
           ],
@@ -280,7 +283,6 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
           onTap: _showCancelDialog,
         ),
         const SizedBox(width: 12),
-
         Expanded(
           child: _buildActionButton(
             null,
@@ -292,14 +294,13 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (_) => CreateRFPScreen(
-                    // ✅ نمرر كل البيانات
                     initialTitle: _rfp!['title'],
                     initialBudget: _rfp!['budget']?.toString(),
                     initialDescription: _rfp!['description'],
                     initialDeadline: _rfp!['deadline'],
                     initialEvaluationCriteria: _rfp!['evaluationCriteria'],
                     initialRequiredTag: _rfp!['requiredTag'],
-                    rfpId: widget.rfpId, // ✅ عشان يعرف يعدّل مو يضيف جديد
+                    rfpId: widget.rfpId,
                   ),
                 ),
               );
@@ -308,7 +309,6 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
           ),
         ),
         const SizedBox(width: 12),
-
         Expanded(
           child: _buildActionButton(
             null,
@@ -394,12 +394,15 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: const TextStyle(color: Colors.grey, fontSize: 14)),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w500,
-            fontSize: 14,
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w500,
+              fontSize: 14,
+            ),
           ),
         ),
       ],
