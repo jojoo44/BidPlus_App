@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'rfp_details_screen.dart';
 import 'proposals_list_screen.dart';
 import 'negotiation_mng_screen.dart';
@@ -31,11 +30,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           .select()
           .eq('userID', userId)
           .order('timeStamp', ascending: false);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _notifications = List<Map<String, dynamic>>.from(data);
           _isLoading = false;
         });
+      }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }

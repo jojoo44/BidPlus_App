@@ -3,7 +3,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'profile_screen.dart';
 import 'create_rfp_screen.dart';
 import 'rfp_details_screen.dart';
-import 'proposals_list_screen.dart';
 import 'rfp_selector_screen.dart';
 import 'active_rfp_details_screen.dart';
 import 'notifications_screen.dart';
@@ -48,11 +47,12 @@ class _BidPlusState extends State<BidPlus> {
   Future<void> _checkAuth() async {
     final user = supabase.auth.currentUser;
     if (user == null) {
-      if (mounted)
+      if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const LoginScreen()),
         );
+      }
       return;
     }
     final data = await supabase

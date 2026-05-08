@@ -138,11 +138,12 @@ class _ContractorNegotiationScreenState
       }
 
       if ((sessionsData as List).isEmpty) {
-        if (mounted)
+        if (mounted) {
           setState(() {
             _sessions = [];
             _isLoading = false;
           });
+        }
         return;
       }
 
@@ -307,7 +308,7 @@ class _ContractorNegotiationScreenState
                     )
                   : ListView.separated(
                       itemCount: _sessions.length,
-                      separatorBuilder: (_, __) => Divider(
+                      separatorBuilder: (_, _) => Divider(
                         color: Colors.white.withOpacity(0.05),
                         height: 1,
                       ),

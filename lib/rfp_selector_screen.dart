@@ -1,6 +1,5 @@
 // rfp_selector_screen.dart
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import 'proposals_list_screen.dart';
 

@@ -108,9 +108,9 @@ class _AHPDialogState extends State<AHPDialog> {
                 ? '  → $nameA and $nameC should be approximately equal\n  ← move "$nameA vs $nameC" slider to center'
                 : '  → $expWinner should be more important than $expLoser by ${expVal.toStringAsFixed(0)}×\n  ← adjust "$nameA vs $nameC"';
             hints.add(
-              '• $abWinner is more important than $abLoser by ${abVal.toStringAsFixed(0)}×\n'
-              '  and $bcWinner is more important than $bcLoser by ${bcVal.toStringAsFixed(0)}×\n'
-              '$expMsg',
+              '• You said $abWinner is more important than $abLoser by \${abVal.toStringAsFixed(0)}×\n'
+                      '  and $bcWinner is more important than $bcLoser by \${bcVal.toStringAsFixed(0)}×\n' +
+                  expMsg,
             );
           }
         }
@@ -122,7 +122,9 @@ class _AHPDialogState extends State<AHPDialog> {
   List<(int, int)> get _pairs {
     final pairs = <(int, int)>[];
     for (int i = 0; i < n; i++)
-      for (int j = i + 1; j < n; j++) pairs.add((i, j));
+      for (int j = i + 1; j < n; j++) {
+        pairs.add((i, j));
+      }
     return pairs;
   }
 

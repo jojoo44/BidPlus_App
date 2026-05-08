@@ -154,7 +154,9 @@ Future<int> _evaluateCriterionFiles({required List<Map<String, dynamic>> files, 
 
 Future<Map<String, dynamic>> _computeAiScoreWithDetails({required Map<String, List<Map<String, dynamic>>> criteriaFiles, required String rfpDescription, required String evaluationCriteria}) async {
   try {
-    if (evaluationCriteria.isEmpty) return {'finalScore': 0, 'criteriaScores': <String, int>{}};
+    if (evaluationCriteria.isEmpty) {
+      return {'finalScore': 0, 'criteriaScores': <String, int>{}};
+    }
     final weights = <String, double>{};
     for (final part in evaluationCriteria.split(',')) {
       final kv = part.trim().split(':');
@@ -164,7 +166,9 @@ Future<Map<String, dynamic>> _computeAiScoreWithDetails({required Map<String, Li
         if (weight > 0) weights[name] = weight;
       }
     }
-    if (weights.isEmpty) return {'finalScore': 0, 'criteriaScores': <String, int>{}};
+    if (weights.isEmpty) {
+      return {'finalScore': 0, 'criteriaScores': <String, int>{}};
+    }
     final criteriaScores = <String, int>{};
     double total = 0;
     for (final entry in weights.entries) {
@@ -220,7 +224,9 @@ class _ContractorRFPDetailsScreenState extends State<ContractorRFPDetailsScreen>
       final list = data as List;
       if (mounted) setState(() {
         _hasSubmitted = list.isNotEmpty;
-        if (list.isNotEmpty) _submittedProposal = Map<String, dynamic>.from(list.first);
+        if (list.isNotEmpty) {
+          _submittedProposal = Map<String, dynamic>.from(list.first);
+        }
       });
     } catch (_) {}
   }
@@ -249,7 +255,7 @@ class _ContractorRFPDetailsScreenState extends State<ContractorRFPDetailsScreen>
     } catch (_) {}
   }
 
-  // ── FIX: فتح الملفات على iOS وAndroid ──
+  // FIX 1: إغلاق _openFile بشكل صحيح
   Future<void> _openFile(String url) async {
     if (url.isEmpty) return;
     try {
@@ -261,12 +267,36 @@ class _ContractorRFPDetailsScreenState extends State<ContractorRFPDetailsScreen>
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cannot open file')));
       }
     }
+  } // FIX 1: القوس كان ناقصاً هنا
+
+  // FIX 2: _openPickedFile خارج _openFile الآن
+  Future<void> _openPickedFile(Map<String, dynamic> fileData) async {
+    final url = fileData['url'] as String? ?? '';
+    final localPath = fileData['localPath'] as String? ?? '';
+    if (url.isNotEmpty) {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+    }
+    if (localPath.isNotEmpty && File(localPath).existsSync()) {
+      final uri = Uri.file(localPath);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cannot open file')));
+    }
   }
 
   void _showSubmitProposalSheet() {
     final priceController = TextEditingController();
     final descController = TextEditingController();
     final Map<String, List<Map<String, dynamic>>> criteriaFiles = {};
+    // FIX 8 & 9: تعريف صحيح مع nullable
     bool isSubmitting = false;
     bool isUploadingFile = false;
     String? uploadingForCriterion;
@@ -276,28 +306,28 @@ class _ContractorRFPDetailsScreenState extends State<ContractorRFPDetailsScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: cardColor,
-      // ── FIX: يناسب الايفون والاندرويد ──
       useSafeArea: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSheetState) {
           Future<void> pickFileForCriterion(String criterionName) async {
-            // ── FIX: على iOS نستخدم withData:false ونقرأ من المسار ──
             final result = await FilePicker.platform.pickFiles(
               type: FileType.custom,
               allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg', 'docx', 'doc'],
-              withData: kIsWeb, // web فقط
+              withData: kIsWeb,
               allowMultiple: true,
             );
             if (result == null || result.files.isEmpty) return;
-            setSheetState(() { isUploadingFile = true; uploadingForCriterion = criterionName; });
+            setSheetState(() {
+              isUploadingFile = true;
+              uploadingForCriterion = criterionName;
+            });
             try {
               final userId = supabase.auth.currentUser!.id;
               criteriaFiles[criterionName] ??= [];
               for (final picked in result.files) {
                 Uint8List? fileBytes;
 
-                // ── محاولة الحصول على bytes ──
                 if (picked.bytes != null && picked.bytes!.isNotEmpty) {
                   fileBytes = picked.bytes;
                 } else if (picked.path != null && picked.path!.isNotEmpty) {
@@ -312,13 +342,14 @@ class _ContractorRFPDetailsScreenState extends State<ContractorRFPDetailsScreen>
                 }
 
                 if (fileBytes == null || fileBytes.isEmpty) {
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Could not read: ${picked.name}')),
-                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Could not read: ${picked.name}')),
+                    );
+                  }
                   continue;
                 }
 
-                // ── رفع للـ Supabase ──
                 final sanitized = picked.name.replaceAll(RegExp(r'[^\w\.\-]'), '_');
                 final path = 'proposals/$userId/${DateTime.now().millisecondsSinceEpoch}_$sanitized';
                 await supabase.storage.from('proposal_attachments').uploadBinary(
@@ -335,13 +366,24 @@ class _ContractorRFPDetailsScreenState extends State<ContractorRFPDetailsScreen>
                 });
               }
               setSheetState(() {});
-              if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('✅ File uploaded!'), backgroundColor: Colors.green, duration: Duration(seconds: 1)),
-              );
+              // FIX 3 & 4: إزالة ScaffoldMessenger المكررة
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('✅ File uploaded!'), backgroundColor: Colors.green, duration: Duration(seconds: 1)),
+                );
+              }
             } catch (e) {
-              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+              // FIX 3 & 4: catch block نظيف بدون تكرار
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Upload failed: $e')),
+                );
+              }
             } finally {
-              setSheetState(() { isUploadingFile = false; uploadingForCriterion = null; });
+              setSheetState(() {
+                isUploadingFile = false;
+                uploadingForCriterion = null;
+              });
             }
           }
 
@@ -400,6 +442,7 @@ class _ContractorRFPDetailsScreenState extends State<ContractorRFPDetailsScreen>
                     const SizedBox(height: 12),
                     ...criteria.map((criterionName) {
                       final files = criteriaFiles[criterionName] ?? [];
+                      // FIX 9: null-safe check لـ uploadingForCriterion
                       final isLoadingThis = isUploadingFile && uploadingForCriterion == criterionName;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 16),
@@ -429,7 +472,8 @@ class _ContractorRFPDetailsScreenState extends State<ContractorRFPDetailsScreen>
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: GestureDetector(
-                                        onTap: () => _openFile(file['url'] as String? ?? ''),
+                                        // FIX 7: استخدام _openPickedFile بدل _openFile لأنها الأنسب هنا
+                                        onTap: () => _openPickedFile(file),
                                         child: Text(
                                           file['name'] as String,
                                           style: const TextStyle(color: Colors.white, fontSize: 12, decoration: TextDecoration.underline, decorationColor: Colors.white54),
@@ -577,7 +621,7 @@ class _ContractorRFPDetailsScreenState extends State<ContractorRFPDetailsScreen>
         },
       ),
     );
-  }
+  } // FIX 6: إغلاق _showSubmitProposalSheet بشكل صحيح
 
   @override
   Widget build(BuildContext context) {

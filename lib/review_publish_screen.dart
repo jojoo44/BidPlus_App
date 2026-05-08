@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 
 class ReviewPublishScreen extends StatefulWidget {
@@ -42,12 +41,14 @@ class _ReviewPublishScreenState extends State<ReviewPublishScreen> {
     if ((_rfp!['description'] ?? '').isEmpty) errors.add('Description is missing.');
     if (_rfp!['budget'] == null) errors.add('Budget is missing.');
     if (_rfp!['deadline'] == null) errors.add('Due Date is missing.');
-    if ((_rfp!['evaluationCriteria'] ?? '').isEmpty)
+    if ((_rfp!['evaluationCriteria'] ?? '').isEmpty) {
       errors.add('Evaluation Criteria is missing.');
+    }
     if (_rfp!['deadline'] != null) {
       final deadline = DateTime.tryParse(_rfp!['deadline']);
-      if (deadline != null && deadline.isBefore(DateTime.now()))
+      if (deadline != null && deadline.isBefore(DateTime.now())) {
         errors.add('Due Date is in the past.');
+      }
     }
     return errors;
   }

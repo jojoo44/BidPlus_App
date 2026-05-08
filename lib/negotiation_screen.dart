@@ -629,6 +629,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     if (_contractId == null) return;
     setState(() => _isUploadingContract = true);
     try {
+<<<<<<< HEAD
       final field = widget.isManager
           ? 'manager_finalized'
           : 'contractor_finalized';
@@ -641,6 +642,15 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           if (widget.isManager) _managerFinalized = true;
           if (!widget.isManager) _contractorFinalized = true;
         });
+=======
+      final field = widget.isManager ? 'manager_finalized' : 'contractor_finalized';
+      await supabase.from('Contract').update({field: true}).eq('id', _contractId!);
+      if (mounted) setState(() {
+        if (widget.isManager)  _managerFinalized    = true;
+        if (!widget.isManager) _contractorFinalized = true;
+      });
+
+>>>>>>> a0e14bd7f674af1b723cd2903a4a1d0f9d159913
       final c = await supabase
           .from('Contract')
           .select('manager_finalized,contractor_finalized')
@@ -654,6 +664,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             .update({'status': 'Active'})
             .eq('id', _contractId!);
         final sid = int.tryParse(widget.sessionId) ?? widget.sessionId;
+<<<<<<< HEAD
         await supabase
             .from('NegoSession')
             .update({
@@ -673,6 +684,18 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             _contractorFinalized = true;
           });
         if (mounted)
+=======
+        await supabase.from('NegoSession').update({
+          'status': 'Completed', 'end_date': DateTime.now().toIso8601String(),
+        }).eq('session_id', sid);
+        await _notifyOtherParty('Contract Active',
+            'The contract for "${widget.rfpTitle}" is finalized by both parties. Project is now active!');
+        if (mounted) setState(() {
+          _contractStatus = 'Active'; _sessionStatus = 'Completed';
+          _managerFinalized = true; _contractorFinalized = true;
+        });
+        if (mounted) {
+>>>>>>> a0e14bd7f674af1b723cd2903a4a1d0f9d159913
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('🎉 Contract finalized! Project is now active.'),

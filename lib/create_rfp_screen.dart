@@ -123,7 +123,9 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
     descriptionController.dispose();
     deadlineController.dispose();
     _requiredSpecController.dispose();
-    for (var c in weightControllers) c.dispose();
+    for (var c in weightControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 

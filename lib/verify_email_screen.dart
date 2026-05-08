@@ -38,9 +38,13 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
   @override
   void dispose() {
-    for (final c in _controllers) c.dispose();
+    for (final c in _controllers) {
+      c.dispose();
+    }
 
-    for (final f in _focusNodes) f.dispose();
+    for (final f in _focusNodes) {
+      f.dispose();
+    }
 
     _cooldownTimer?.cancel();
 
@@ -175,7 +179,9 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   }
 
   void _clearBoxes() {
-    for (final c in _controllers) c.clear();
+    for (final c in _controllers) {
+      c.clear();
+    }
 
     _focusNodes[0].requestFocus();
   }

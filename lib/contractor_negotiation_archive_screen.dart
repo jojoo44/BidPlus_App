@@ -41,11 +41,12 @@ class _ContractorNegotiationArchiveScreenState
           .order('start_date', ascending: false);
 
       if ((sessionsData as List).isEmpty) {
-        if (mounted)
+        if (mounted) {
           setState(() {
             _sessions = [];
             _isLoading = false;
           });
+        }
         return;
       }
 
@@ -106,11 +107,12 @@ class _ContractorNegotiationArchiveScreenState
         });
       }
 
-      if (mounted)
+      if (mounted) {
         setState(() {
           _sessions = enriched;
           _isLoading = false;
         });
+      }
     } catch (e) {
       debugPrint('ContractorNegotiationArchive error: $e');
       if (mounted) setState(() => _isLoading = false);

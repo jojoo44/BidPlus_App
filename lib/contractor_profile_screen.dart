@@ -78,7 +78,7 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
           .eq('contractorId', _targetId)
           .order('created_at', ascending: false);
 
-      if (mounted)
+      if (mounted) {
         setState(() {
           _username = data['username'] ?? '';
           _email = data['email'] ?? '';
@@ -91,6 +91,7 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
           _bioCtrl.text = _bio;
           _isLoading = false;
         });
+      }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -107,10 +108,16 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
         _editingBio = false;
       });
     } catch (e) {
+<<<<<<< HEAD
       if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
+=======
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+>>>>>>> a0e14bd7f674af1b723cd2903a4a1d0f9d159913
     }
   }
 
@@ -143,6 +150,18 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                     Icons.broken_image,
                     color: Colors.grey,
                     size: 60,
+              appBar: AppBar(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                elevation: 0,
+              ),
+              body: Center(
+                child: InteractiveViewer(
+                  child: Image.network(
+                    url,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) =>
+                        const Icon(Icons.broken_image, color: Colors.grey, size: 60),
                   ),
                 ),
               ),
@@ -257,10 +276,16 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
         _loadAll();
       }
     } catch (e) {
+<<<<<<< HEAD
       if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
+=======
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+>>>>>>> a0e14bd7f674af1b723cd2903a4a1d0f9d159913
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
@@ -278,12 +303,13 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
 
   Future<void> _logout() async {
     await supabase.auth.signOut();
-    if (mounted)
+    if (mounted) {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
         (route) => false,
       );
+    }
   }
 
   @override
@@ -874,11 +900,16 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                           width: 64,
                           height: 52,
                           fit: BoxFit.cover,
+<<<<<<< HEAD
                           errorBuilder: (_, __, ___) => const Icon(
                             Icons.broken_image,
                             color: Colors.grey,
                             size: 24,
                           ),
+=======
+                          errorBuilder: (_, _, _) =>
+                              const Icon(Icons.broken_image, color: Colors.grey, size: 24),
+>>>>>>> a0e14bd7f674af1b723cd2903a4a1d0f9d159913
                         ),
                       )
                     : Column(
