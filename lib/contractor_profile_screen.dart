@@ -32,7 +32,11 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
 
   List<Map<String, dynamic>> _reviews = [];
   List<Map<String, dynamic>> _portfolio = [];
+  // ── اسم المشروع لكل review ──
+  Map<String, String> _rfpTitles = {};
+
   bool _isLoading = true;
+  bool _showReviews = false;
   bool _isUploading = false;
   bool _isOwner = false;
   bool _editingBio = false;
@@ -78,7 +82,31 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
           .eq('contractorId', _targetId)
           .order('created_at', ascending: false);
 
-      if (mounted) {
+      // ── جيب أسماء المشاريع من RFP ──
+      final reviewList = List<Map<String, dynamic>>.from(reviews);
+      final rfpIds = reviewList
+          .map((r) => r['rfpId']?.toString())
+          .where((id) => id != null && id != '0' && id != 'null')
+          .toSet()
+          .toList();
+
+      final Map<String, String> rfpTitles = {};
+      if (rfpIds.isNotEmpty) {
+        for (final id in rfpIds) {
+          try {
+            final rfp = await supabase
+                .from('RFP')
+                .select('title')
+                .eq('rfpID', id!)
+                .maybeSingle();
+            if (rfp != null && rfp['title'] != null) {
+              rfpTitles[id] = rfp['title'].toString();
+            }
+          } catch (_) {}
+        }
+      }
+
+      if (mounted)
         setState(() {
           _username = data['username'] ?? '';
           _email = data['email'] ?? '';
@@ -86,12 +114,12 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
           _tag = data['specializationTag'] ?? '';
           _bio = data['bio'] ?? '';
           _photoUrl = data['photoUrl'];
-          _reviews = List<Map<String, dynamic>>.from(reviews);
+          _reviews = reviewList;
+          _rfpTitles = rfpTitles;
           _portfolio = List<Map<String, dynamic>>.from(portfolio);
           _bioCtrl.text = _bio;
           _isLoading = false;
         });
-      }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -108,11 +136,10 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
         _editingBio = false;
       });
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
     }
   }
 
@@ -259,11 +286,10 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
         _loadAll();
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
@@ -281,13 +307,12 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
 
   Future<void> _logout() async {
     await supabase.auth.signOut();
-    if (mounted) {
+    if (mounted)
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
         (route) => false,
       );
-    }
   }
 
   @override
@@ -511,43 +536,119 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
 
                           const SizedBox(height: 24),
 
-                          // ── Reviews ──
-                          _sectionTitle(
-                            _reviews.isEmpty
-                                ? 'Reviews'
-                                : 'Reviews (${_reviews.length})',
-                          ),
-                          if (_reviews.isEmpty)
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(20),
-                              margin: const EdgeInsets.only(bottom: 20),
+                          // ── Reviews — قابلة للطي ──
+                          GestureDetector(
+                            onTap: () =>
+                                setState(() => _showReviews = !_showReviews),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
                               decoration: BoxDecoration(
                                 color: surface,
                                 borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.06),
+                                ),
                               ),
-                              child: const Column(
+                              child: Row(
                                 children: [
-                                  Icon(
+                                  const Icon(
                                     Icons.rate_review_outlined,
-                                    color: Colors.grey,
-                                    size: 36,
+                                    color: blue,
+                                    size: 18,
                                   ),
-                                  SizedBox(height: 8),
+                                  const SizedBox(width: 10),
                                   Text(
-                                    'No reviews yet',
-                                    style: TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 13,
+                                    _reviews.isEmpty
+                                        ? 'Reviews'
+                                        : 'Reviews (${_reviews.length})',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  if (_reviews.isNotEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: blue.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        '${_reviews.length}',
+                                        style: const TextStyle(
+                                          color: blue,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  const SizedBox(width: 8),
+                                  AnimatedRotation(
+                                    turns: _showReviews ? 0.5 : 0,
+                                    duration: const Duration(milliseconds: 200),
+                                    child: Icon(
+                                      Icons.keyboard_arrow_down,
+                                      color: _reviews.isEmpty
+                                          ? Colors.white24
+                                          : blue,
+                                      size: 22,
                                     ),
                                   ),
                                 ],
                               ),
-                            )
-                          else ...[
-                            ..._reviews.map((r) => _buildReviewCard(r)),
-                            const SizedBox(height: 20),
-                          ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          AnimatedCrossFade(
+                            firstChild: const SizedBox.shrink(),
+                            secondChild: _reviews.isEmpty
+                                ? Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(20),
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    decoration: BoxDecoration(
+                                      color: surface,
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: const Column(
+                                      children: [
+                                        Icon(
+                                          Icons.rate_review_outlined,
+                                          color: Colors.grey,
+                                          size: 36,
+                                        ),
+                                        SizedBox(height: 8),
+                                        Text(
+                                          'No reviews yet',
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : Column(
+                                    children: [
+                                      ..._reviews.map(
+                                        (r) => _buildReviewCard(r),
+                                      ),
+                                    ],
+                                  ),
+                            crossFadeState: _showReviews
+                                ? CrossFadeState.showSecond
+                                : CrossFadeState.showFirst,
+                            duration: const Duration(milliseconds: 250),
+                          ),
+                          const SizedBox(height: 16),
 
                           // ── Portfolio ──
                           Row(
@@ -713,6 +814,11 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
     final quality = (r['quality'] as num?)?.toDouble() ?? 0;
     final timeliness = (r['timeliness'] as num?)?.toDouble() ?? 0;
     final overall = (r['overallScore'] as num?)?.toDouble() ?? 0;
+    final rfpId = r['rfpId']?.toString() ?? '';
+    // ── اجيب اسم المشروع من الـ map ──
+    final rfpTitle =
+        _rfpTitles[rfpId] ??
+        (rfpId.isNotEmpty && rfpId != '0' ? 'Project #$rfpId' : '');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -725,6 +831,35 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── اسم المشروع ──
+          if (rfpTitle.isNotEmpty) ...[
+            Row(
+              children: [
+                const Icon(
+                  Icons.folder_outlined,
+                  color: Color(0xFF3395FF),
+                  size: 14,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    rfpTitle,
+                    style: const TextStyle(
+                      color: Color(0xFF3395FF),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            const Divider(color: Colors.white10, height: 1),
+            const SizedBox(height: 10),
+          ],
+
+          // ── Overall Score ──
           Row(
             children: [
               Container(
@@ -770,6 +905,7 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
           const Divider(color: Colors.white10, height: 1),
           const SizedBox(height: 12),
 
+          // ── المعايير ──
           _criterionRow('Work Quality', Icons.build_outlined, quality),
           const SizedBox(height: 8),
           _criterionRow(
@@ -778,6 +914,7 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
             timeliness,
           ),
 
+          // ── الكومنت ──
           if (comment.isNotEmpty) ...[
             const SizedBox(height: 12),
             const Divider(color: Colors.white10, height: 1),
