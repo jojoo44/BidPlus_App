@@ -3,11 +3,8 @@ import 'package:flutter/material.dart';
 import 'ahp_calculator.dart';
 import 'ahp_guide_sheet.dart';
 
-/// نافذة AHP — تظهر للمدير عشان يقارن المعايير ببعض
-/// الناتج: Map<String, double> اسم المعيار → وزنه (0.0 - 1.0)
 class AHPDialog extends StatefulWidget {
-  final List<String> criteria; // أسماء المعايير
-
+  final List<String> criteria;
   const AHPDialog({super.key, required this.criteria});
 
   @override
@@ -15,7 +12,6 @@ class AHPDialog extends StatefulWidget {
 }
 
 class _AHPDialogState extends State<AHPDialog> {
-  // Saaty scale labels
   static const List<String> _scaleLabels = [
     '1/9',
     '1/7',
@@ -47,7 +43,7 @@ class _AHPDialogState extends State<AHPDialog> {
 
   late int n;
   late int pairCount;
-  late List<int> _sliderIndices; // index في _scaleValues لكل مقارنة
+  late List<int> _sliderIndices;
   AHPResult? _result;
 
   @override
@@ -55,36 +51,24 @@ class _AHPDialogState extends State<AHPDialog> {
     super.initState();
     n = widget.criteria.length;
     pairCount = AHPCalculator.comparisonsCount(n);
-    // ابدأ كل مقارنة بـ 1 (Equal)
-    _sliderIndices = List.filled(pairCount, 4); // index 4 = القيمة 1
+    _sliderIndices = List.filled(pairCount, 4);
     _recalculate();
   }
 
   void _recalculate() {
-    // السلايدر: index 0 (أقصى يسار) = المعيار الأيسر More important by 9×
-    //           index 4 (وسط)        = Equal (1)
-    //           index 8 (أقصى يمين) = المعيار الأيمن More important by 9×
-    // matrix[i][j] = كم i أهم من j
-    // لو السلايدر يسار → i أهم → قيمة > 1
-    // لو السلايدر يمين → j أهم → قيمة < 1
     final upperValues = _sliderIndices.map((idx) {
-      if (idx == 4) return 1.0; // Equal
+      if (idx == 4) return 1.0;
       final raw = _scaleValues[idx];
-      // _scaleValues = [1/9, 1/7, 1/5, 1/3, 1, 3, 5, 7, 9]
-      // يسار (0-3): raw صغير (1/9..1/3) → نعكس → قيمة كبيرة = i أهم ✓
-      // يمين (5-8): raw كبير (3..9)     → نعكس → قيمة صغيرة = j أهم ✓
       return 1.0 / raw;
     }).toList();
     final matrix = AHPCalculator.buildMatrix(n, upperValues);
     setState(() => _result = AHPCalculator.calculate(matrix));
   }
 
-  /// يحلل التناقضات ويرجع رسائل توضيحية
   List<String> _getInconsistencyHints() {
     if (_result == null || _result!.isConsistent) return [];
     final hints = <String>[];
     final pairsList = _pairs;
-
     final upperValues = _sliderIndices.map((idx) {
       if (idx == 4) return 1.0;
       return 1.0 / _scaleValues[idx];
@@ -108,7 +92,6 @@ class _AHPDialogState extends State<AHPDialog> {
             final nameA = widget.criteria[a];
             final nameB = widget.criteria[b];
             final nameC = widget.criteria[c];
-
             final abWinner = ab >= 1 ? nameA : nameB;
             final abLoser = ab >= 1 ? nameB : nameA;
             final abVal = (ab >= 1 ? ab : 1 / ab).clamp(1.0, 9.0);
@@ -121,18 +104,13 @@ class _AHPDialogState extends State<AHPDialog> {
               1.0,
               9.0,
             );
-
-            // لو expected قريب من 1 → Equalان
             final expMsg = (expVal < 1.5)
-                ? '  → therefore $nameA and $nameC should be approximately equal\n'
-                      '  ← move the "$nameA vs $nameC" slider to the center'
-                : '  → therefore $expWinner should be more important than $expLoser by \${expVal.toStringAsFixed(0)}×\n'
-                      '  ← adjust the "$nameA vs $nameC" comparison';
-
+                ? '  → $nameA and $nameC should be approximately equal\n  ← move "$nameA vs $nameC" slider to center'
+                : '  → $expWinner should be more important than $expLoser by ${expVal.toStringAsFixed(0)}×\n  ← adjust "$nameA vs $nameC"';
             hints.add(
-              '• You said $abWinner is more important than $abLoser by \${abVal.toStringAsFixed(0)}×\n'
-                      '  and $bcWinner is more important than $bcLoser by \${bcVal.toStringAsFixed(0)}×\n' +
-                  expMsg,
+              '• $abWinner is more important than $abLoser by ${abVal.toStringAsFixed(0)}×\n'
+              '  and $bcWinner is more important than $bcLoser by ${bcVal.toStringAsFixed(0)}×\n'
+              '$expMsg',
             );
           }
         }
@@ -141,7 +119,6 @@ class _AHPDialogState extends State<AHPDialog> {
     return hints;
   }
 
-  /// يرجع اسم الزوج (i, j) بالترتيب
   List<(int, int)> get _pairs {
     final pairs = <(int, int)>[];
     for (int i = 0; i < n; i++)
@@ -151,14 +128,19 @@ class _AHPDialogState extends State<AHPDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final screenW = MediaQuery.of(context).size.width;
+
     return Dialog(
       backgroundColor: bgColor,
-      insetPadding: const EdgeInsets.all(16),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: screenW < 400 ? 10 : 16,
+        vertical: 24,
+      ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -171,24 +153,27 @@ class _AHPDialogState extends State<AHPDialog> {
                       color: primaryBlue.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(Icons.balance, color: primaryBlue, size: 20),
+                    child: Icon(Icons.balance, color: primaryBlue, size: 18),
                   ),
-                  const SizedBox(width: 12),
-                  const Expanded(
+                  const SizedBox(width: 10),
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'AHP — Set criteria weights',
+                          'criteria weights',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 16,
+                            fontSize: screenW < 400 ? 14 : 16,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
                           'Move the slider toward the more important criterion',
-                          style: TextStyle(color: Colors.grey, fontSize: 12),
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 11,
+                          ),
                         ),
                       ],
                     ),
@@ -197,19 +182,23 @@ class _AHPDialogState extends State<AHPDialog> {
                     icon: Icon(
                       Icons.help_outline,
                       color: primaryBlue,
-                      size: 20,
+                      size: 18,
                     ),
-                    tooltip: 'How does AHP work?',
                     onPressed: () => AHPGuideSheet.show(context),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
+                  const SizedBox(width: 8),
                   IconButton(
-                    icon: const Icon(Icons.close, color: Colors.grey),
+                    icon: const Icon(Icons.close, color: Colors.grey, size: 18),
                     onPressed: () => Navigator.pop(context),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
                 ],
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               // ── المقارنات ──
               ..._pairs.asMap().entries.map((entry) {
@@ -225,15 +214,18 @@ class _AHPDialogState extends State<AHPDialog> {
                     : _scaleLabels[leftWins ? (8 - sliderIdx) : sliderIdx];
 
                 return Container(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  padding: const EdgeInsets.all(16),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: cardColor,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Column(
                     children: [
-                      // أسماء المعيارين
+                      // أسماء المعيارين + البادج
                       Row(
                         children: [
                           Expanded(
@@ -245,13 +237,13 @@ class _AHPDialogState extends State<AHPDialog> {
                                 fontWeight: leftWins
                                     ? FontWeight.bold
                                     : FontWeight.normal,
-                                fontSize: 14,
+                                fontSize: 13,
                               ),
                             ),
                           ),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
+                              horizontal: 8,
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
@@ -263,9 +255,7 @@ class _AHPDialogState extends State<AHPDialog> {
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              equal
-                                  ? 'Equal'
-                                  : 'More important by $displayLabel×',
+                              equal ? 'Equal' : '×$displayLabel',
                               style: TextStyle(
                                 color: equal
                                     ? Colors.grey
@@ -284,14 +274,14 @@ class _AHPDialogState extends State<AHPDialog> {
                                 fontWeight: rightWins
                                     ? FontWeight.bold
                                     : FontWeight.normal,
-                                fontSize: 14,
+                                fontSize: 13,
                               ),
                             ),
                           ),
                         ],
                       ),
 
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 8),
 
                       // السلايدر
                       SliderTheme(
@@ -319,32 +309,35 @@ class _AHPDialogState extends State<AHPDialog> {
                         ),
                       ),
 
-                      // تسمية السكيل
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            '← Much more important',
-                            style: TextStyle(
-                              color: primaryBlue.withOpacity(0.7),
-                              fontSize: 10,
+                      // ── تسمية السكيل — مُصلحة ✓ ──
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '← More',
+                              style: TextStyle(
+                                color: primaryBlue.withOpacity(0.7),
+                                fontSize: 10,
+                              ),
                             ),
-                          ),
-                          Text(
-                            'Equal',
-                            style: TextStyle(
-                              color: Colors.white38,
-                              fontSize: 10,
+                            Text(
+                              'Equal',
+                              style: TextStyle(
+                                color: Colors.white38,
+                                fontSize: 10,
+                              ),
                             ),
-                          ),
-                          Text(
-                            'Much more important →',
-                            style: TextStyle(
-                              color: greenColor.withOpacity(0.7),
-                              fontSize: 10,
+                            Text(
+                              'More →',
+                              style: TextStyle(
+                                color: greenColor.withOpacity(0.7),
+                                fontSize: 10,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -353,10 +346,10 @@ class _AHPDialogState extends State<AHPDialog> {
 
               const SizedBox(height: 8),
 
-              // ── النتيجة (الأوزان) ──
+              // ── النتيجة ──
               if (_result != null) ...[
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: cardColor,
                     borderRadius: BorderRadius.circular(14),
@@ -381,23 +374,24 @@ class _AHPDialogState extends State<AHPDialog> {
                             size: 16,
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            _result!.isConsistent
-                                ? 'Weights are consistent ✓'
-                                : 'Inconsistency detected — CR=\${_result!.consistencyRatio.toStringAsFixed(2)}',
-                            style: TextStyle(
-                              color: _result!.isConsistent
-                                  ? greenColor
-                                  : redColor,
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
+                          Expanded(
+                            child: Text(
+                              _result!.isConsistent
+                                  ? 'Weights are consistent ✓'
+                                  : 'Inconsistency — CR=${_result!.consistencyRatio.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                color: _result!.isConsistent
+                                    ? greenColor
+                                    : redColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ],
                       ),
                       if (!_result!.isConsistent) ...[
                         const SizedBox(height: 10),
-                        // ── رسائل التناقض الذكية ──
                         ...() {
                           final hints = _getInconsistencyHints();
                           if (hints.isEmpty) {
@@ -414,8 +408,8 @@ class _AHPDialogState extends State<AHPDialog> {
                           return hints
                               .map(
                                 (hint) => Container(
-                                  margin: const EdgeInsets.only(bottom: 10),
-                                  padding: const EdgeInsets.all(12),
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFF1A1A2E),
                                     borderRadius: BorderRadius.circular(10),
@@ -425,10 +419,10 @@ class _AHPDialogState extends State<AHPDialog> {
                                   ),
                                   child: Text(
                                     hint,
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       color: Colors.white70,
-                                      fontSize: 12,
-                                      height: 1.7,
+                                      fontSize: 11,
+                                      height: 1.6,
                                     ),
                                   ),
                                 ),
@@ -436,7 +430,7 @@ class _AHPDialogState extends State<AHPDialog> {
                               .toList();
                         }(),
                       ],
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 12),
                       ...widget.criteria.asMap().entries.map((e) {
                         final w = _result!.weights[e.key];
                         final pct = AHPCalculator.weightsToPercent(
@@ -489,7 +483,7 @@ class _AHPDialogState extends State<AHPDialog> {
                 ),
               ],
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
               // ── زر التأكيد ──
               SizedBox(
@@ -507,7 +501,6 @@ class _AHPDialogState extends State<AHPDialog> {
                   onPressed: _result == null
                       ? null
                       : () {
-                          // ارجع Map: اسم المعيار → وزنه
                           final resultMap = <String, double>{};
                           for (int i = 0; i < n; i++) {
                             resultMap[widget.criteria[i]] = _result!.weights[i];

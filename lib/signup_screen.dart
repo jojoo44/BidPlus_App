@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'verify_email_screen.dart';
+import 'dashboard.dart';
+import 'contractor_dashboard_screen.dart';
 import '../main.dart';
 
 class SignUpScreen extends StatefulWidget {
@@ -116,7 +117,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       final ext = file.extension ?? 'file';
       final filePath =
           'portfolio/$userId/${DateTime.now().millisecondsSinceEpoch}_${file.name}';
-
       await supabase.storage
           .from('profiles')
           .uploadBinary(
@@ -127,16 +127,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
               contentType: 'application/$ext',
             ),
           );
-
       final fileUrl = supabase.storage.from('profiles').getPublicUrl(filePath);
-
       String fileType = 'file';
       if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext.toLowerCase())) {
         fileType = 'image';
       } else if (ext.toLowerCase() == 'pdf') {
         fileType = 'pdf';
       }
-
       await supabase.from('ContractorPortfolio').insert({
         'contractorId': userId,
         'title': file.name,
@@ -145,7 +142,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
         'uploadDate': DateTime.now().toIso8601String().split('T')[0],
       });
     }
-
     for (final link in _addedLinks) {
       await supabase.from('ContractorPortfolio').insert({
         'contractorId': userId,
@@ -165,9 +161,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       _passwordError = null;
       _specializationError = null;
     });
-
     bool isValid = true;
-
     if (_nameController.text.trim().isEmpty) {
       setState(() => _nameError = 'Full name is required.');
       isValid = false;
@@ -175,7 +169,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       setState(() => _nameError = 'Name must be at least 3 characters.');
       isValid = false;
     }
-
     final emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$');
     if (_emailController.text.trim().isEmpty) {
       setState(() => _emailError = 'Email is required.');
@@ -184,7 +177,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       setState(() => _emailError = 'Please enter a valid email address.');
       isValid = false;
     }
-
     if (_phoneController.text.trim().isEmpty) {
       setState(() => _phoneError = 'Phone number is required.');
       isValid = false;
@@ -192,7 +184,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       setState(() => _phoneError = 'Please enter a valid phone number.');
       isValid = false;
     }
-
     if (_passwordController.text.isEmpty) {
       setState(() => _passwordError = 'Password is required.');
       isValid = false;
@@ -202,7 +193,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       );
       isValid = false;
     }
-
     if (widget.role != 'Manager') {
       if (_specializationController.text.trim().isEmpty) {
         setState(
@@ -215,8 +205,94 @@ class _SignUpScreenState extends State<SignUpScreen> {
         isValid = false;
       }
     }
-
     return isValid;
+  }
+
+  // ── Dialog نجاح التسجيل ──
+  void _showSuccessDialog(String role, String userId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        backgroundColor: const Color(0xFF1C242F),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle,
+                  color: Colors.green,
+                  size: 48,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Account Created!',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Your account has been successfully created. You can now start using BidPlus.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey, fontSize: 14, height: 1.5),
+              ),
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF5D78FF),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    // انتقل للداشبورد حسب الدور
+                    if (role.toLowerCase() == 'manager') {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (_) => const BidPlus()),
+                        (route) => false,
+                      );
+                    } else {
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ContractorDashboardScreen(),
+                        ),
+                        (route) => false,
+                      );
+                    }
+                  },
+                  child: const Text(
+                    'Get Started',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _signUp() async {
@@ -240,12 +316,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
       final updateData = <String, dynamic>{
         'contactInfo': _phoneController.text.trim(),
       };
-
       if (widget.role != 'Manager') {
         updateData['specialization'] = _specializationController.text.trim();
         updateData['specializationTag'] = _selectedTag;
       }
-
       await supabase.from('User').update(updateData).eq('id', userId);
 
       if (widget.role != 'Manager') {
@@ -253,15 +327,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       }
 
       if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => VerifyEmailScreen(
-              role: widget.role,
-              email: _emailController.text.trim(),
-            ),
-          ),
-        );
+        _showSuccessDialog(widget.role, userId);
       }
     } on AuthException catch (e) {
       final msg = e.message.toLowerCase();
@@ -370,7 +436,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 controller: _specializationController,
                 errorText: _specializationError,
               ),
-
               const SizedBox(height: 12),
               _buildLabel('Field / Category'),
               Wrap(
@@ -427,7 +492,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ],
                 ),
               ],
-
               const SizedBox(height: 16),
               const Align(
                 alignment: Alignment.centerLeft,
@@ -460,7 +524,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                 ],
               ),
-
               if (_selectedFiles.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 ..._selectedFiles.map(
@@ -497,7 +560,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                 ),
               ],
-
               if (_addedLinks.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 ..._addedLinks.map(

@@ -1,20 +1,14 @@
 // topsis_service.dart
-// ══════════════════════════════════════════════
-//  BidPlus+ — TOPSIS Service
-//  يستقبل بيانات المقاولين + أوزان AHP
-//  ويُرجع قائمة مرتبة مع Ci scores
-// ══════════════════════════════════════════════
 import 'dart:math';
 
-/// نتيجة TOPSIS لمقاول واحد
 class TopsisResult {
   final String proposalId;
-  final String contractorId; // submitterUserId (uuid)
+  final String contractorId;
   final String contractorName;
-  final double ciScore; // Closeness Index (0→1)
-  final double ciPercent; // ciScore × 100
-  final bool isQualified; // Ci >= rfpThreshold
-  final Map<String, double> criteriaScores; // { 'cost': 80, 'experience': 60 }
+  final double ciScore;
+  final double ciPercent;
+  final bool isQualified;
+  final Map<String, double> criteriaScores;
 
   const TopsisResult({
     required this.proposalId,
@@ -28,40 +22,17 @@ class TopsisResult {
 }
 
 class TopsisService {
-  // ─────────────────────────────────────────────
-  //  Fallback فقط — لا يُستخدم لو في أوزان
-  // ─────────────────────────────────────────────
   static const double qualificationThreshold = 0.60;
 
-  // ─────────────────────────────────────────────
-  //  حساب Threshold من أوزان AHP ← الجديد
-  //
-  //  المنطق: كلما المانجر ركّز الوزن على معيار واحد
-  //  → هو متطلب أكثر → threshold أعلى
-  //
-  //  threshold = 0.5 + (maxWeight - 1/n) × 0.5
-  //
-  //  أمثلة:
-  //  Cost:80%, Experience:20% → 0.5+(0.8-0.5)×0.5 = 0.65 = 65%
-  //  Cost:60%, Experience:40% → 0.5+(0.6-0.5)×0.5 = 0.55 = 55%
-  //  Cost:50%, Experience:50% → 0.5+(0.5-0.5)×0.5 = 0.50 = 50%
-  //  Cost:33%, Exp:33%, Tech:33% → 0.5+(0.33-0.33)×0.5 = 0.50 = 50%
-  // ─────────────────────────────────────────────
   static double calculateRFPThreshold(Map<String, double> weights) {
     if (weights.isEmpty) return qualificationThreshold;
     final n = weights.length;
     final maxWeight = weights.values.reduce((a, b) => a > b ? a : b);
     final equalWeight = 1.0 / n;
     final threshold = 0.5 + (maxWeight - equalWeight) * 0.5;
-    // clamp بين 0.40 و 0.85
     return threshold.clamp(0.40, 0.85);
   }
 
-  // ─────────────────────────────────────────────
-  //  Parse Helpers
-  // ─────────────────────────────────────────────
-
-  /// Parse "Cost:40%, Experience:60%" → { 'cost': 0.4, 'experience': 0.6 }
   static Map<String, double> parseWeights(String? raw) {
     if (raw == null || raw.trim().isEmpty) return {};
     final weights = <String, double>{};
@@ -75,7 +46,6 @@ class TopsisService {
     return weights;
   }
 
-  /// Parse "Cost: 80 | Experience: 60" → { 'cost': 80.0, 'experience': 60.0 }
   static Map<String, double> parseComments(String? raw) {
     if (raw == null || raw.trim().isEmpty) return {};
     final scores = <String, double>{};
@@ -87,10 +57,6 @@ class TopsisService {
     }
     return scores;
   }
-
-  // ─────────────────────────────────────────────
-  //  Core TOPSIS Steps
-  // ─────────────────────────────────────────────
 
   static List<List<double>> _normalize(List<List<double>> matrix) {
     final n = matrix.length;
@@ -148,9 +114,6 @@ class TopsisService {
     );
   }
 
-  // ─────────────────────────────────────────────
-  //  Main Entry Point
-  // ─────────────────────────────────────────────
   static List<TopsisResult> analyze({
     required List<Map<String, dynamic>> proposals,
     required Map<String, double> weights,
@@ -158,9 +121,7 @@ class TopsisService {
   }) {
     if (proposals.isEmpty || weights.isEmpty) return [];
 
-    // ← الجديد: احسب threshold من أوزان الـ RFP
     final rfpThreshold = calculateRFPThreshold(weights);
-
     final criteriaOrder = weights.keys.toList();
     final weightList = criteriaOrder.map((c) => weights[c] ?? 0.0).toList();
 
@@ -168,7 +129,7 @@ class TopsisService {
       if (criteriaTypes != null && criteriaTypes.containsKey(c)) {
         return criteriaTypes[c]!;
       }
-      return 'benefit'; // AI scores: أعلى دائماً = أفضل
+      return 'benefit';
     }).toList();
 
     final withScores = proposals.where((p) {
@@ -178,18 +139,23 @@ class TopsisService {
 
     if (withScores.isEmpty) return [];
 
-    // ← الجديد: لو مقاول واحد فقط → يرجع مباشرة بدون TOPSIS
+    // ── مقاول واحد فقط ──
+    // لا نشغّل TOPSIS، لكن نتحقق من الدرجات
+    // لو مجموع الدرجات = 0 → غير مؤهل
     if (withScores.length == 1) {
       final p = withScores.first;
       final scores = parseComments(p['comments']?.toString());
+      final totalScore = scores.values.fold(0.0, (a, b) => a + b);
+      final qualified = totalScore > 0;
+      final ci = qualified ? 1.0 : 0.0;
       return [
         TopsisResult(
           proposalId: p['ProposalID']?.toString() ?? '',
           contractorId: p['submitterUserId']?.toString() ?? '',
           contractorName: p['contractorname']?.toString() ?? 'Unknown',
-          ciScore: 1.0,
-          ciPercent: 100.0,
-          isQualified: true,
+          ciScore: ci,
+          ciPercent: ci * 100,
+          isQualified: qualified,
           criteriaScores: scores,
         ),
       ];
@@ -218,7 +184,6 @@ class TopsisService {
               withScores[i]['contractorname']?.toString() ?? 'Unknown',
           ciScore: ci,
           ciPercent: ci * 100,
-          // ← الجديد: يستخدم rfpThreshold بدل القيمة الثابتة
           isQualified: ci >= rfpThreshold,
           criteriaScores: parseComments(withScores[i]['comments']?.toString()),
         ),
@@ -229,13 +194,11 @@ class TopsisService {
     return results;
   }
 
-  /// AI Insight
   static String generateInsight(
     TopsisResult result,
     Map<String, double> weights,
   ) {
     if (!result.isQualified) {
-      // ← الجديد: يعرض الـ threshold الحقيقي للـ RFP
       final t = weights.isNotEmpty
           ? calculateRFPThreshold(weights)
           : qualificationThreshold;
