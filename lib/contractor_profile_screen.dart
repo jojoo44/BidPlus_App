@@ -108,16 +108,11 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
         _editingBio = false;
       });
     } catch (e) {
-<<<<<<< HEAD
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
-=======
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
->>>>>>> a0e14bd7f674af1b723cd2903a4a1d0f9d159913
     }
   }
 
@@ -150,18 +145,6 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                     Icons.broken_image,
                     color: Colors.grey,
                     size: 60,
-              appBar: AppBar(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                elevation: 0,
-              ),
-              body: Center(
-                child: InteractiveViewer(
-                  child: Image.network(
-                    url,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, _, _) =>
-                        const Icon(Icons.broken_image, color: Colors.grey, size: 60),
                   ),
                 ),
               ),
@@ -276,16 +259,11 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
         _loadAll();
       }
     } catch (e) {
-<<<<<<< HEAD
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
-=======
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
->>>>>>> a0e14bd7f674af1b723cd2903a4a1d0f9d159913
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
@@ -730,7 +708,6 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
     ),
   );
 
-  // ── Review Card المحدّثة — تعرض المعايير + النجوم + الكومنت ──
   Widget _buildReviewCard(Map<String, dynamic> r) {
     final comment = r['comment']?.toString() ?? '';
     final quality = (r['quality'] as num?)?.toDouble() ?? 0;
@@ -748,7 +725,6 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Overall Score ──
           Row(
             children: [
               Container(
@@ -794,7 +770,6 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
           const Divider(color: Colors.white10, height: 1),
           const SizedBox(height: 12),
 
-          // ── المعايير ──
           _criterionRow('Work Quality', Icons.build_outlined, quality),
           const SizedBox(height: 8),
           _criterionRow(
@@ -803,7 +778,6 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
             timeliness,
           ),
 
-          // ── الكومنت ──
           if (comment.isNotEmpty) ...[
             const SizedBox(height: 12),
             const Divider(color: Colors.white10, height: 1),
@@ -831,7 +805,6 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
     );
   }
 
-  // ── صف معيار واحد مع نجوم ──
   Widget _criterionRow(String label, IconData icon, double score) {
     final stars = score.round().clamp(0, 5);
     return Row(
@@ -900,16 +873,11 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                           width: 64,
                           height: 52,
                           fit: BoxFit.cover,
-<<<<<<< HEAD
                           errorBuilder: (_, __, ___) => const Icon(
                             Icons.broken_image,
                             color: Colors.grey,
                             size: 24,
                           ),
-=======
-                          errorBuilder: (_, _, _) =>
-                              const Icon(Icons.broken_image, color: Colors.grey, size: 24),
->>>>>>> a0e14bd7f674af1b723cd2903a4a1d0f9d159913
                         ),
                       )
                     : Column(

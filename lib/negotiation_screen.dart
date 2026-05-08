@@ -190,12 +190,13 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           table: 'Contract',
           callback: (p) {
             final row = p.newRecord;
-            if (mounted)
+            if (mounted) {
               setState(() {
                 _contractStatus = row['status'] ?? _contractStatus;
                 _managerFinalized = row['manager_finalized'] == true;
                 _contractorFinalized = row['contractor_finalized'] == true;
               });
+            }
           },
         )
         .onPostgresChanges(
@@ -230,12 +231,13 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollCtrl.hasClients)
+      if (_scrollCtrl.hasClients) {
         _scrollCtrl.animateTo(
           _scrollCtrl.position.maxScrollExtent,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
+      }
     });
   }
 
@@ -276,15 +278,17 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           'isManager': widget.isManager,
         },
       );
-      if (mounted)
+      if (mounted) {
         setState(
           () => _aiSuggestionText = res.data['suggestion']?.toString() ?? '',
         );
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isGeneratingSuggestion = false);
     }
@@ -301,7 +305,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         body: {'history': history},
       );
       final data = res.data as Map<String, dynamic>;
-      if (mounted)
+      if (mounted) {
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -314,11 +318,13 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             ),
           ),
         );
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Failed: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isGeneratingSuggestion = false);
     }
@@ -353,10 +359,11 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         '${widget.isManager ? "Manager" : widget.contractorName} sent a message in "${widget.rfpTitle}".',
       );
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
@@ -388,25 +395,26 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
       if (widget.isManager) data['manager_id'] = userId;
       if (!widget.isManager) data['contractor_id'] = userId;
       await supabase.from('NegoRounds').insert(data);
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ File sent!'),
             backgroundColor: Colors.green,
           ),
         );
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
   }
 
   Future<void> _uploadFirstContract() async {
-    // ── منع رفع ملف ثاني ──
     if (_firstContractUrl != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -468,31 +476,31 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         'Contract Ready',
         '${widget.isManager ? "Manager" : widget.contractorName} attached a contract for "${widget.rfpTitle}". Please download, sign, and re-upload.',
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _firstContractUrl = url;
           _firstContractName = file.name;
           _firstContractUploader = uploaderRole;
           _contractStatus = 'Pending_Signature';
         });
-      if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ Contract sent to the other party!'),
             backgroundColor: Colors.green,
           ),
         );
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Upload error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isUploadingContract = false);
     }
   }
 
-  // ── حذف العقد ──
   Future<void> _deleteContract() async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -549,10 +557,11 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         );
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isUploadingContract = false);
     }
@@ -603,23 +612,24 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         'Contract Signed',
         '${widget.isManager ? "Manager" : widget.contractorName} uploaded the signed contract. Please finalize.',
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _signedContractUrl = url;
           _signedContractName = file.name;
         });
-      if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ Signed contract uploaded!'),
             backgroundColor: Colors.green,
           ),
         );
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Upload error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isUploadingContract = false);
     }
@@ -629,7 +639,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     if (_contractId == null) return;
     setState(() => _isUploadingContract = true);
     try {
-<<<<<<< HEAD
       final field = widget.isManager
           ? 'manager_finalized'
           : 'contractor_finalized';
@@ -637,20 +646,12 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           .from('Contract')
           .update({field: true})
           .eq('id', _contractId!);
-      if (mounted)
+      if (mounted) {
         setState(() {
           if (widget.isManager) _managerFinalized = true;
           if (!widget.isManager) _contractorFinalized = true;
         });
-=======
-      final field = widget.isManager ? 'manager_finalized' : 'contractor_finalized';
-      await supabase.from('Contract').update({field: true}).eq('id', _contractId!);
-      if (mounted) setState(() {
-        if (widget.isManager)  _managerFinalized    = true;
-        if (!widget.isManager) _contractorFinalized = true;
-      });
-
->>>>>>> a0e14bd7f674af1b723cd2903a4a1d0f9d159913
+      }
       final c = await supabase
           .from('Contract')
           .select('manager_finalized,contractor_finalized')
@@ -664,7 +665,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             .update({'status': 'Active'})
             .eq('id', _contractId!);
         final sid = int.tryParse(widget.sessionId) ?? widget.sessionId;
-<<<<<<< HEAD
         await supabase
             .from('NegoSession')
             .update({
@@ -676,50 +676,40 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           'Contract Active',
           'The contract for "${widget.rfpTitle}" is finalized by both parties. Project is now active!',
         );
-        if (mounted)
+        if (mounted) {
           setState(() {
             _contractStatus = 'Active';
             _sessionStatus = 'Completed';
             _managerFinalized = true;
             _contractorFinalized = true;
           });
-        if (mounted)
-=======
-        await supabase.from('NegoSession').update({
-          'status': 'Completed', 'end_date': DateTime.now().toIso8601String(),
-        }).eq('session_id', sid);
-        await _notifyOtherParty('Contract Active',
-            'The contract for "${widget.rfpTitle}" is finalized by both parties. Project is now active!');
-        if (mounted) setState(() {
-          _contractStatus = 'Active'; _sessionStatus = 'Completed';
-          _managerFinalized = true; _contractorFinalized = true;
-        });
-        if (mounted) {
->>>>>>> a0e14bd7f674af1b723cd2903a4a1d0f9d159913
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('🎉 Contract finalized! Project is now active.'),
               backgroundColor: Colors.green,
             ),
           );
+        }
       } else {
         await _notifyOtherParty(
           'Finalize Contract',
           '${widget.isManager ? "Manager" : widget.contractorName} confirmed their part. Please finalize the contract.',
         );
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('✅ Waiting for the other party to confirm.'),
               backgroundColor: Colors.green,
             ),
           );
+        }
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isUploadingContract = false);
     }
@@ -757,7 +747,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           recipientId = rfp?['creatorUser']?.toString();
         }
       }
-      if (recipientId != null)
+      if (recipientId != null) {
         await supabase.from('Notification').insert({
           'userID': recipientId,
           'type': type,
@@ -765,6 +755,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           'readStatus': false,
           'timeStamp': DateTime.now().toIso8601String(),
         });
+      }
     } catch (_) {}
   }
 
@@ -1198,7 +1189,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
       );
     }
 
-    // ── أنا رفعت + لم يُوقَّع ← زر الحذف ──
     if (_iHaveUploaded && !_signedUploaded) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -1217,8 +1207,9 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                   Expanded(
                     child: GestureDetector(
                       onTap: () async {
-                        if (_firstContractUrl != null)
+                        if (_firstContractUrl != null) {
                           await _openUrl(_firstContractUrl!);
+                        }
                       },
                       child: _fileBox(
                         _firstContractName ?? 'Contract',
@@ -1228,7 +1219,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // ── زر الحذف ──
                   GestureDetector(
                     onTap: _isUploadingContract ? null : _deleteContract,
                     child: Container(
@@ -1440,8 +1430,9 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
               const SizedBox(height: 4),
               GestureDetector(
                 onTap: () async {
-                  if (_signedContractUrl != null)
+                  if (_signedContractUrl != null) {
                     await _openUrl(_signedContractUrl!);
+                  }
                 },
                 child: _fileBox(
                   _signedContractName ?? 'Signed Contract',
