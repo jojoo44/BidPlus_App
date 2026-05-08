@@ -113,13 +113,11 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     setState(() => _isLoading = true);
     try {
       final sessionId = int.tryParse(widget.sessionId) ?? widget.sessionId;
-
       final session = await supabase
           .from('NegoSession')
           .select('status')
           .eq('session_id', sessionId)
           .maybeSingle();
-
       final rounds = await supabase
           .from('NegoRounds')
           .select(
@@ -127,7 +125,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           )
           .eq('sessionID', sessionId)
           .order('roundID', ascending: true);
-
       try {
         final c = await supabase
             .from('Contract')
@@ -141,20 +138,17 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           _contractorFinalized = c['contractor_finalized'] == true;
         }
       } catch (_) {}
-
       final d = await _fetchDocument('Contract', ascending: true);
       if (d != null) {
         _firstContractUrl = d['fileURL']?.toString();
         _firstContractName = d['fullName']?.toString();
         _firstContractUploader = d['uploadedBy']?.toString();
       }
-
       final s = await _fetchDocument('Contract_Signed', ascending: false);
       if (s != null) {
         _signedContractUrl = s['fileURL']?.toString();
         _signedContractName = s['fullName']?.toString();
       }
-
       if (mounted) {
         setState(() {
           _sessionStatus = session?['status'] ?? 'Active';
@@ -170,7 +164,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
 
   void _subscribeRealtime() {
     final sidInt = int.tryParse(widget.sessionId) ?? 0;
-
     _channel = supabase
         .channel(
           'nego_${widget.sessionId}_${DateTime.now().millisecondsSinceEpoch}',
@@ -183,17 +176,12 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             final row = p.newRecord;
             if (!mounted) return;
             final rowSid = row['sessionID']?.toString();
-            final match =
-                rowSid == widget.sessionId || rowSid == sidInt.toString();
-            if (!match) return;
+            if (rowSid != widget.sessionId && rowSid != sidInt.toString())
+              return;
             final roundId = row['roundID']?.toString();
-            final exists = _rounds.any(
-              (r) => r['roundID']?.toString() == roundId,
-            );
-            if (!exists) {
-              setState(() => _rounds.add(row));
-              _scrollToBottom();
-            }
+            if (_rounds.any((r) => r['roundID']?.toString() == roundId)) return;
+            setState(() => _rounds.add(row));
+            _scrollToBottom();
           },
         )
         .onPostgresChanges(
@@ -218,10 +206,10 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             final row = p.newRecord;
             final rowSession = row['sessionID']?.toString();
             final widgetSid = widget.sessionId;
-            final sessionMatch =
-                rowSession == widgetSid ||
-                rowSession == int.tryParse(widgetSid)?.toString();
-            if (!sessionMatch || !mounted) return;
+            if ((rowSession != widgetSid &&
+                    rowSession != int.tryParse(widgetSid)?.toString()) ||
+                !mounted)
+              return;
             final type = row['uploadType']?.toString() ?? '';
             if (type == 'Contract') {
               setState(() {
@@ -242,13 +230,12 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollCtrl.hasClients) {
+      if (_scrollCtrl.hasClients)
         _scrollCtrl.animateTo(
           _scrollCtrl.position.maxScrollExtent,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
-      }
     });
   }
 
@@ -289,17 +276,15 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           'isManager': widget.isManager,
         },
       );
-      if (mounted) {
+      if (mounted)
         setState(
           () => _aiSuggestionText = res.data['suggestion']?.toString() ?? '',
         );
-      }
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Failed: $e')));
-      }
     } finally {
       if (mounted) setState(() => _isGeneratingSuggestion = false);
     }
@@ -316,7 +301,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         body: {'history': history},
       );
       final data = res.data as Map<String, dynamic>;
-      if (mounted) {
+      if (mounted)
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -329,13 +314,11 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             ),
           ),
         );
-      }
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Failed: $e')));
-      }
     } finally {
       if (mounted) setState(() => _isGeneratingSuggestion = false);
     }
@@ -370,11 +353,10 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         '${widget.isManager ? "Manager" : widget.contractorName} sent a message in "${widget.rfpTitle}".',
       );
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
@@ -406,26 +388,36 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
       if (widget.isManager) data['manager_id'] = userId;
       if (!widget.isManager) data['contractor_id'] = userId;
       await supabase.from('NegoRounds').insert(data);
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ File sent!'),
             backgroundColor: Colors.green,
           ),
         );
-      }
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
   }
 
   Future<void> _uploadFirstContract() async {
+    // ── منع رفع ملف ثاني ──
+    if (_firstContractUrl != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'A contract is already uploaded. Delete it first to upload a new one.',
+          ),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'doc', 'docx'],
@@ -442,7 +434,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
       final path =
           'contracts/${widget.sessionId}_${uploaderRole}_original_${_sanitizeFileName(file.name)}';
       final url = await _uploadToStorage(path, file);
-
       final sidInt = int.tryParse(widget.sessionId) ?? 0;
       await supabase.from('Document').insert({
         'fullName': file.name,
@@ -453,7 +444,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         'uploadType': 'Contract',
         'sessionID': sidInt,
       });
-
       if (_contractId == null) {
         final row = await supabase
             .from('Contract')
@@ -474,34 +464,95 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             .update({'status': 'Pending_Signature'})
             .eq('id', _contractId!);
       }
-
       await _notifyOtherParty(
         'Contract Ready',
         '${widget.isManager ? "Manager" : widget.contractorName} attached a contract for "${widget.rfpTitle}". Please download, sign, and re-upload.',
       );
-
-      if (mounted) {
+      if (mounted)
         setState(() {
           _firstContractUrl = url;
           _firstContractName = file.name;
           _firstContractUploader = uploaderRole;
           _contractStatus = 'Pending_Signature';
         });
-      }
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ Contract sent to the other party!'),
             backgroundColor: Colors.green,
           ),
         );
-      }
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Upload error: $e')));
+    } finally {
+      if (mounted) setState(() => _isUploadingContract = false);
+    }
+  }
+
+  // ── حذف العقد ──
+  Future<void> _deleteContract() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Delete Contract?',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'This will remove the uploaded contract. You can upload a new one after.',
+          style: TextStyle(color: Colors.grey, fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    setState(() => _isUploadingContract = true);
+    try {
+      final sidInt = int.tryParse(widget.sessionId) ?? 0;
+      await supabase
+          .from('Document')
+          .delete()
+          .eq('uploadType', 'Contract')
+          .eq('sessionID', sidInt);
+      if (mounted) {
+        setState(() {
+          _firstContractUrl = null;
+          _firstContractName = null;
+          _firstContractUploader = null;
+          _contractStatus = '';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Contract deleted. You can upload a new one.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
       }
+    } catch (e) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _isUploadingContract = false);
     }
@@ -509,8 +560,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
 
   Future<void> _openUrl(String url) async {
     try {
-      final uri = Uri.parse(url);
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } catch (_) {
       try {
         await launchUrl(Uri.parse(url), mode: LaunchMode.platformDefault);
@@ -539,7 +589,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
       final path =
           'contracts/${widget.sessionId}_${uploaderRole}_signed_${_sanitizeFileName(file.name)}';
       final url = await _uploadToStorage(path, file);
-
       final sidInt = int.tryParse(widget.sessionId) ?? 0;
       await supabase.from('Document').insert({
         'fullName': file.name,
@@ -550,31 +599,27 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         'uploadType': 'Contract_Signed',
         'sessionID': sidInt,
       });
-
       await _notifyOtherParty(
         'Contract Signed',
         '${widget.isManager ? "Manager" : widget.contractorName} uploaded the signed contract. Please finalize.',
       );
-
       if (mounted)
         setState(() {
           _signedContractUrl = url;
           _signedContractName = file.name;
         });
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ Signed contract uploaded!'),
             backgroundColor: Colors.green,
           ),
         );
-      }
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Upload error: $e')));
-      }
     } finally {
       if (mounted) setState(() => _isUploadingContract = false);
     }
@@ -596,7 +641,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           if (widget.isManager) _managerFinalized = true;
           if (!widget.isManager) _contractorFinalized = true;
         });
-
       final c = await supabase
           .from('Contract')
           .select('manager_finalized,contractor_finalized')
@@ -604,7 +648,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           .single();
       final both =
           c['manager_finalized'] == true && c['contractor_finalized'] == true;
-
       if (both) {
         await supabase
             .from('Contract')
@@ -629,34 +672,31 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             _managerFinalized = true;
             _contractorFinalized = true;
           });
-        if (mounted) {
+        if (mounted)
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('🎉 Contract finalized! Project is now active.'),
               backgroundColor: Colors.green,
             ),
           );
-        }
       } else {
         await _notifyOtherParty(
           'Finalize Contract',
           '${widget.isManager ? "Manager" : widget.contractorName} confirmed their part. Please finalize the contract.',
         );
-        if (mounted) {
+        if (mounted)
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('✅ Waiting for the other party to confirm.'),
               backgroundColor: Colors.green,
             ),
           );
-        }
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
     } finally {
       if (mounted) setState(() => _isUploadingContract = false);
     }
@@ -694,7 +734,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           recipientId = rfp?['creatorUser']?.toString();
         }
       }
-      if (recipientId != null) {
+      if (recipientId != null)
         await supabase.from('Notification').insert({
           'userID': recipientId,
           'type': type,
@@ -702,7 +742,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           'readStatus': false,
           'timeStamp': DateTime.now().toIso8601String(),
         });
-      }
     } catch (_) {}
   }
 
@@ -743,7 +782,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
   @override
   Widget build(BuildContext context) {
     final isCompleted = _sessionStatus == 'Completed';
-
     return Scaffold(
       backgroundColor: bg,
       resizeToAvoidBottomInset: true,
@@ -815,7 +853,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                             .toList(),
                       ),
                     ),
-
                   if (_showAISuggestion && !isCompleted)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
@@ -913,7 +950,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                         ),
                       ),
                     ),
-
                   if (!isCompleted)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
@@ -955,9 +991,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                         ),
                       ),
                     ),
-
                   _buildContractSection(),
-
                   if (_contractActive)
                     _buildBanner(
                       Icons.check_circle,
@@ -968,7 +1002,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
               ),
             ),
           ),
-
           Expanded(
             child: _isLoading
                 ? const Center(
@@ -1002,7 +1035,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                     },
                   ),
           ),
-
           if (!isCompleted && !_contractActive)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -1143,6 +1175,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
       );
     }
 
+    // ── أنا رفعت + لم يُوقَّع ← زر الحذف ──
     if (_iHaveUploaded && !_signedUploaded) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -1156,16 +1189,51 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              GestureDetector(
-                onTap: () async {
-                  if (_firstContractUrl != null)
-                    await _openUrl(_firstContractUrl!);
-                },
-                child: _fileBox(
-                  _firstContractName ?? 'Contract',
-                  Colors.amber,
-                  showDownload: true,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () async {
+                        if (_firstContractUrl != null)
+                          await _openUrl(_firstContractUrl!);
+                      },
+                      child: _fileBox(
+                        _firstContractName ?? 'Contract',
+                        Colors.amber,
+                        showDownload: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // ── زر الحذف ──
+                  GestureDetector(
+                    onTap: _isUploadingContract ? null : _deleteContract,
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.redAccent.withOpacity(0.4),
+                        ),
+                      ),
+                      child: _isUploadingContract
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                color: Colors.redAccent,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.delete_outline,
+                              color: Colors.redAccent,
+                              size: 20,
+                            ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 10),
               const Row(
@@ -1409,7 +1477,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         ),
       );
     }
-
     return const SizedBox.shrink();
   }
 
@@ -1501,7 +1568,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
   );
 }
 
-// ── Chat Bubble ──────────────────────────────────────────────────────────────
 class _ChatBubble extends StatelessWidget {
   final String text, time, label;
   final bool isMe;
@@ -1513,7 +1579,6 @@ class _ChatBubble extends StatelessWidget {
     required this.label,
     this.fileURL,
   });
-
   bool get _isImage {
     if (fileURL == null) return false;
     final url = fileURL!.toLowerCase().split('?').first;
@@ -1525,11 +1590,9 @@ class _ChatBubble extends StatelessWidget {
   }
 
   bool get _isFile => fileURL != null && fileURL!.isNotEmpty;
-
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
@@ -1579,7 +1642,6 @@ class _ChatBubble extends StatelessWidget {
                   ),
                 ),
                 child: _isImage
-                    // ── صورة: تظهر مباشرة في الشات ──
                     ? ClipRRect(
                         borderRadius: BorderRadius.only(
                           topLeft: const Radius.circular(16),
@@ -1609,9 +1671,7 @@ class _ChatBubble extends StatelessWidget {
                         ),
                       )
                     : _isFile
-                    // ── PDF/Doc: بطاقة جميلة ──
                     ? _fileTile(screenWidth)
-                    // ── نص عادي ──
                     : Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 14,
@@ -1648,7 +1708,6 @@ class _ChatBubble extends StatelessWidget {
     final fileName = text.replaceFirst('📎 ', '').trim().isNotEmpty
         ? text.replaceFirst('📎 ', '').trim()
         : (fileURL ?? '').split('/').last.split('?').first;
-
     final ext = fileName.split('.').last.toLowerCase();
     IconData icon;
     Color iconColor;
@@ -1662,7 +1721,6 @@ class _ChatBubble extends StatelessWidget {
       icon = Icons.insert_drive_file;
       iconColor = Colors.white70;
     }
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
@@ -1713,7 +1771,6 @@ class _ChatBubble extends StatelessWidget {
   }
 }
 
-// ── AIContractReviewScreen ───────────────────────────────────────────────────
 class AIContractReviewScreen extends StatefulWidget {
   final String contractorName, proposalId, finalPrice, duration, terms;
   const AIContractReviewScreen({
@@ -1730,7 +1787,6 @@ class AIContractReviewScreen extends StatefulWidget {
 
 class _AIContractReviewScreenState extends State<AIContractReviewScreen> {
   late final TextEditingController _priceCtrl, _durationCtrl, _termsCtrl;
-
   @override
   void initState() {
     super.initState();
