@@ -75,14 +75,23 @@ class _ManagerProposalDetailsScreenState
   }
 
   Future<void> _openFile(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cannot open file')),
-        );
+    if (url.isEmpty) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('No file URL available')));
+      return;
+    }
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      try {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.platformDefault);
+      } catch (_) {
+        if (mounted)
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Could not open file')));
       }
     }
   }
@@ -100,7 +109,6 @@ class _ManagerProposalDetailsScreenState
           .update({'status': newStatus})
           .eq('ProposalID', proposalId);
 
-      // ── FIX: استخدام maybeSingle() بدل single() لتجنب خطأ 406 ──
       if (newStatus == 'Accepted' && rfpId != null) {
         final existing = await supabase
             .from('NegoSession')
@@ -118,7 +126,6 @@ class _ManagerProposalDetailsScreenState
       }
 
       if (contractorId != null) {
-        // ── FIX: maybeSingle() بدل single() لتجنب 406 عند تعدد الصفوف ──
         final contractorData = await supabase
             .from('User')
             .select('notificationsEnabled')
@@ -154,7 +161,6 @@ class _ManagerProposalDetailsScreenState
       widget.onStatusChanged();
 
       if (mounted) {
-        // ── ألوان الـ Snackbar حسب الحالة ──
         Color snackColor;
         String snackMsg;
         if (newStatus == 'Accepted') {
@@ -193,9 +199,9 @@ class _ManagerProposalDetailsScreenState
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -284,7 +290,6 @@ class _ManagerProposalDetailsScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── FIX: Status Banner - إصلاح الـ Overflow ──
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -296,7 +301,6 @@ class _ManagerProposalDetailsScreenState
                 ),
               ),
               child: _status.toLowerCase() == 'accepted'
-                  // ── إذا accepted: عمود بدل Row لتجنب الـ overflow ──
                   ? Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -352,7 +356,6 @@ class _ManagerProposalDetailsScreenState
                         ),
                       ],
                     )
-                  // ── باقي الحالات: Row عادي ──
                   : Row(
                       children: [
                         Icon(
@@ -374,7 +377,6 @@ class _ManagerProposalDetailsScreenState
 
             const SizedBox(height: 20),
 
-            // Contractor Info
             _sectionTitle('Contractor Info'),
             Container(
               padding: const EdgeInsets.all(16),
@@ -414,7 +416,6 @@ class _ManagerProposalDetailsScreenState
 
             const SizedBox(height: 16),
 
-            // Project Info
             _sectionTitle('Project Info'),
             _infoCard([
               _row(Icons.title, 'Project', rfp['title'] ?? '—'),
@@ -428,7 +429,6 @@ class _ManagerProposalDetailsScreenState
 
             const SizedBox(height: 16),
 
-            // Submitted Documents
             _sectionTitle('Submitted Documents'),
             Container(
               padding: const EdgeInsets.all(16),
@@ -475,7 +475,9 @@ class _ManagerProposalDetailsScreenState
                               Container(
                                 padding: const EdgeInsets.all(8),
                                 decoration: BoxDecoration(
-                                  color: _fileColor(uploadType).withOpacity(0.1),
+                                  color: _fileColor(
+                                    uploadType,
+                                  ).withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Icon(
@@ -530,7 +532,6 @@ class _ManagerProposalDetailsScreenState
 
             const SizedBox(height: 16),
 
-            // Cover Letter
             if (desc.isNotEmpty) ...[
               _sectionTitle('Cover Letter'),
               Container(
@@ -553,7 +554,6 @@ class _ManagerProposalDetailsScreenState
               const SizedBox(height: 16),
             ],
 
-            // Evaluation Criteria Responses
             if (comments.isNotEmpty) ...[
               _sectionTitle('Evaluation Criteria Responses'),
               Container(
@@ -614,7 +614,6 @@ class _ManagerProposalDetailsScreenState
 
             const SizedBox(height: 16),
 
-            // Action Buttons
             if (_status.toLowerCase() != 'accepted' &&
                 _status.toLowerCase() != 'rejected') ...[
               Row(
@@ -691,7 +690,6 @@ class _ManagerProposalDetailsScreenState
                 ),
               ),
             ] else ...[
-              // ── FIX: زر Reset to Submitted - لون أزرق جميل ──
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -705,7 +703,9 @@ class _ManagerProposalDetailsScreenState
                     ),
                     elevation: 0,
                   ),
-                  onPressed: _isLoading ? null : () => _updateStatus('Submitted'),
+                  onPressed: _isLoading
+                      ? null
+                      : () => _updateStatus('Submitted'),
                   icon: const Icon(Icons.refresh, size: 18),
                   label: const Text(
                     'Reset to Submitted',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'create_rfp_screen.dart';
 import 'review_publish_screen.dart';
 import '../main.dart';
@@ -17,6 +18,7 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
   static const Color primaryBlue = Color(0xFF3395FF);
 
   Map<String, dynamic>? _rfp;
+  List<Map<String, dynamic>> _attachments = [];
   bool _isLoading = true;
   bool _isDeleting = false;
 
@@ -33,16 +35,50 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
           .select()
           .eq('rfpID', widget.rfpId)
           .single();
-      if (mounted)
+
+      // جلب المرفقات
+      final docs = await supabase
+          .from('Document')
+          .select()
+          .eq('uploadType', 'RFP_Attachment')
+          .order('uploadDate', ascending: false);
+
+      if (mounted) {
         setState(() {
           _rfp = data;
+          _attachments = List<Map<String, dynamic>>.from(docs);
           _isLoading = false;
         });
+      }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading RFP: $e')));
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading RFP: $e')));
+      }
+    }
+  }
+
+  Future<void> _openFile(String? url) async {
+    if (url == null || url.isEmpty) {
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('No file URL available')));
+      return;
+    }
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      try {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.platformDefault);
+      } catch (_) {
+        if (mounted)
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Could not open file')));
+      }
     }
   }
 
@@ -60,10 +96,12 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
         );
       }
     } catch (e) {
-      setState(() => _isDeleting = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) {
+        setState(() => _isDeleting = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 
@@ -213,21 +251,96 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
                   const SizedBox(height: 25),
                   _buildSectionTitle("Key Information"),
                   _buildKeyInfoRow(
-                    "RFP ID",
+                    'RFP ID',
                     '#${widget.rfpId.substring(0, widget.rfpId.length.clamp(0, 8)).toUpperCase()}',
                   ),
                   _buildKeyInfoRow(
-                    "Estimated Budget",
+                    'Estimated Budget',
                     _rfp!['budget'] != null ? '\$${_rfp!['budget']}' : '—',
                   ),
-                  _buildKeyInfoRow("Deadline", _rfp!['deadline'] ?? '—'),
-                  _buildKeyInfoRow("Created", _rfp!['creationDate'] ?? '—'),
+                  _buildKeyInfoRow('Deadline', _rfp!['deadline'] ?? '—'),
+                  _buildKeyInfoRow('Created', _rfp!['creationDate'] ?? '—'),
 
                   if (_rfp!['evaluationCriteria'] != null) ...[
                     const SizedBox(height: 25),
                     _buildSectionTitle("Evaluation Criteria"),
                     _buildContentBox(_rfp!['evaluationCriteria']),
                   ],
+
+                  // ── Attachments ──
+                  const SizedBox(height: 25),
+                  _buildSectionTitle("Attachments"),
+                  _attachments.isEmpty
+                      ? Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF161D27),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(
+                                Icons.folder_open,
+                                color: Colors.white24,
+                                size: 18,
+                              ),
+                              SizedBox(width: 10),
+                              Text(
+                                'No attachments',
+                                style: TextStyle(
+                                  color: Colors.white38,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : Column(
+                          children: _attachments.map((doc) {
+                            final url = doc['fileURL'] as String?;
+                            final name = doc['fullName'] ?? 'File';
+                            return GestureDetector(
+                              onTap: () => _openFile(url),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF161D27),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.white12),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.description_outlined,
+                                      color: primaryBlue,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        name,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 13,
+                                          decoration: TextDecoration.underline,
+                                          decorationColor: Colors.white38,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.open_in_new_rounded,
+                                      color: primaryBlue,
+                                      size: 16,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
 
                   const SizedBox(height: 40),
                   _buildActionButtons(),
@@ -250,16 +363,15 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.green.withOpacity(0.3)),
         ),
-        // ✅ الإصلاح: Flexible عشان النص ما يطلع خارج الـ frame
-        child: Row(
+        child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.check_circle, color: Colors.green, size: 20),
-            const SizedBox(width: 8),
+            Icon(Icons.check_circle, color: Colors.green, size: 20),
+            SizedBox(width: 8),
             Flexible(
               child: Text(
                 'RFP is Published — Visible to Contractors',
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.green,
                   fontWeight: FontWeight.w600,
                   fontSize: 13,

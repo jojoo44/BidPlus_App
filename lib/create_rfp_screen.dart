@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import 'ahp_calculator.dart';
 import 'ahp_dialog.dart';
@@ -129,6 +130,23 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
     super.dispose();
   }
 
+  // ── فتح الملف ──
+  Future<void> _openFile(String url) async {
+    if (url.isEmpty) return;
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      try {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.platformDefault);
+      } catch (_) {
+        if (mounted)
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Could not open file')));
+      }
+    }
+  }
+
   Future<void> _openAHPDialog() async {
     if (criteriaList.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -208,18 +226,20 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
           _uploadedUrls.add(publicUrl);
         });
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Files uploaded!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Files uploaded!'),
+            backgroundColor: Colors.green,
+          ),
+        );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
     } finally {
-      setState(() => _isUploadingFile = false);
+      if (mounted) setState(() => _isUploadingFile = false);
     }
   }
 
@@ -297,7 +317,6 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
           Navigator.pop(context);
         }
       } else {
-        // ✅ FIX: maybeSingle() بدل single()
         final newRfp = await supabase
             .from('RFP')
             .insert({
@@ -309,9 +328,7 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
             .select('rfpID')
             .maybeSingle();
 
-        if (newRfp == null) {
-          throw Exception('Failed to create RFP');
-        }
+        if (newRfp == null) throw Exception('Failed to create RFP');
 
         for (int i = 0; i < _pickedFiles.length; i++) {
           await supabase.from('Document').insert({
@@ -334,15 +351,17 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
         }
       }
     } on PostgrestException catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: ${e.message}')));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: ${e.message}')));
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -550,10 +569,13 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
             ..._pickedFiles.asMap().entries.map((entry) {
               final idx = entry.key;
               final file = entry.value;
+              final url = idx < _uploadedUrls.length ? _uploadedUrls[idx] : '';
               return _buildUploadedFileTile(
                 file.name,
                 '${(file.size / 1024).toStringAsFixed(1)} KB',
-                () => _removeFile(idx),
+                url: url,
+                onRemove: () => _removeFile(idx),
+                onOpen: url.isNotEmpty ? () => _openFile(url) : null,
               );
             }),
 
@@ -687,11 +709,14 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
     ),
   );
 
+  // ── tile فيه زر فتح + زر حذف ──
   Widget _buildUploadedFileTile(
     String name,
-    String size,
-    VoidCallback onRemove,
-  ) => Container(
+    String size, {
+    required String url,
+    required VoidCallback onRemove,
+    VoidCallback? onOpen,
+  }) => Container(
     margin: const EdgeInsets.only(bottom: 10),
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
@@ -718,6 +743,20 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
             ],
           ),
         ),
+        // زر فتح الملف
+        if (onOpen != null)
+          GestureDetector(
+            onTap: onOpen,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 6),
+              child: Icon(
+                Icons.open_in_new,
+                color: Color(0xFF3395FF),
+                size: 18,
+              ),
+            ),
+          ),
+        // زر حذف الملف
         GestureDetector(
           onTap: onRemove,
           child: const Icon(Icons.close, color: Colors.grey, size: 18),
