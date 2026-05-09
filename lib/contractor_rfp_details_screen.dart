@@ -11,7 +11,37 @@ import '../main.dart';
 import 'final_total_score_screen.dart';
 import 'contractor_proposal_details_screen.dart';
 
-// ✅ يرسل fileUrl للـ Edge Function التي تحمل الملف وترسله لـ GPT-4o
+String get _openAiApiKey {
+  final key = const String.fromEnvironment('OPENAI_API_KEY', defaultValue: '');
+  if (key.isEmpty) {
+    throw Exception('OPENAI_API_KEY not set!');
+  }
+  return key;
+}
+
+Future<String?> _uploadFileToOpenAI(
+  Uint8List fileBytes,
+  String fileName,
+) async {
+  try {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('https://api.openai.com/v1/files'),
+    );
+    request.headers['Authorization'] = 'Bearer $_openAiApiKey';
+    request.files.add(
+      http.MultipartFile.fromBytes('file', fileBytes, filename: fileName),
+    );
+    request.fields['purpose'] = 'assistants';
+    final response = await request.send();
+    final body = await response.stream.bytesToString();
+    if (response.statusCode != 200) return null;
+    return jsonDecode(body)['id'] as String?;
+  } catch (e) {
+    return null;
+  }
+}
+
 Future<int> _evaluateSingleFile({
   required String fileUrl,
   required String fileName,
@@ -67,37 +97,22 @@ Future<Map<String, dynamic>> _computeAiScoreWithDetails({
   required String evaluationCriteria,
 }) async {
   try {
-    debugPrint('📊 evaluationCriteria from DB: "$evaluationCriteria"');
-    debugPrint('📁 criteriaFiles keys: ${criteriaFiles.keys.toList()}');
-
-    if (evaluationCriteria.trim().isEmpty) {
-      debugPrint('❌ evaluationCriteria is empty!');
+    if (evaluationCriteria.isEmpty) {
       return {'finalScore': 0, 'criteriaScores': <String, int>{}};
     }
-
     final weights = <String, double>{};
     for (final part in evaluationCriteria.split(',')) {
-      final trimmed = part.trim();
-      final colonIdx = trimmed.indexOf(':');
-      if (colonIdx == -1) continue;
-      final name = trimmed.substring(0, colonIdx).trim();
-      final rawWeight = trimmed
-          .substring(colonIdx + 1)
-          .trim()
-          .replaceAll('%', '')
-          .trim();
-      final weight = (double.tryParse(rawWeight) ?? 0) / 100;
-      debugPrint('⚖️ "$name" | raw="$rawWeight" | weight=$weight');
-      if (weight > 0) weights[name] = weight;
+      final kv = part.trim().split(':');
+      if (kv.length >= 2) {
+        final name = kv[0].trim();
+        final weight =
+            (double.tryParse(kv[1].trim().replaceAll('%', '')) ?? 0) / 100;
+        if (weight > 0) weights[name] = weight;
+      }
     }
-
     if (weights.isEmpty) {
-      debugPrint('❌ No valid weights parsed!');
       return {'finalScore': 0, 'criteriaScores': <String, int>{}};
     }
-
-    debugPrint('✅ Parsed weights: $weights');
-
     final criteriaScores = <String, int>{};
     double total = 0;
     for (final entry in weights.entries) {
@@ -185,9 +200,8 @@ class _ContractorRFPDetailsScreenState
       if (mounted)
         setState(() {
           _hasSubmitted = list.isNotEmpty;
-          if (list.isNotEmpty) {
+          if (list.isNotEmpty)
             _submittedProposal = Map<String, dynamic>.from(list.first);
-          }
         });
     } catch (_) {}
   }
@@ -239,25 +253,30 @@ class _ContractorRFPDetailsScreenState
     }
   }
 
+  // FIX 2: _openPickedFile خارج _openFile الآن
   Future<void> _openPickedFile(Map<String, dynamic> fileData) async {
-  final url = fileData['url'] as String? ?? '';
-  if (url.isNotEmpty) {
-    final uri = Uri.parse(url);
-    try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-      return;
-    } catch (_) {
-      try {
-        await launchUrl(uri, mode: LaunchMode.platformDefault);
+    final url = fileData['url'] as String? ?? '';
+    final localPath = fileData['localPath'] as String? ?? '';
+    if (url.isNotEmpty) {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
         return;
-      } catch (_) {}
+      }
+    }
+    if (localPath.isNotEmpty && File(localPath).existsSync()) {
+      final uri = Uri.file(localPath);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        return;
+      }
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Cannot open file')));
     }
   }
-  if (mounted) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Cannot open file')));
-  }
-}
 
   void _showSubmitProposalSheet() {
     final priceController = TextEditingController();
@@ -295,32 +314,29 @@ class _ContractorRFPDetailsScreenState
               criteriaFiles[criterionName] ??= [];
               for (final picked in result.files) {
                 Uint8List? fileBytes;
-
                 if (picked.bytes != null && picked.bytes!.isNotEmpty) {
                   fileBytes = picked.bytes;
                 } else if (picked.path != null && picked.path!.isNotEmpty) {
                   try {
                     final f = File(picked.path!);
-                    if (await f.exists()) {
-                      fileBytes = await f.readAsBytes();
-                    }
+                    if (await f.exists()) fileBytes = await f.readAsBytes();
                   } catch (e) {
                     debugPrint('Read file error: $e');
                   }
                 }
-
                 if (fileBytes == null || fileBytes.isEmpty) {
-                  if (mounted) {
+                  if (mounted)
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                           content: Text('Could not read: ${picked.name}')),
                     );
-                  }
                   continue;
                 }
 
-                final sanitized =
-                    picked.name.replaceAll(RegExp(r'[^\w\.\-]'), '_');
+                final sanitized = picked.name.replaceAll(
+                  RegExp(r'[^\w\.\-]'),
+                  '_',
+                );
                 final path =
                     'proposals/$userId/${DateTime.now().millisecondsSinceEpoch}_$sanitized';
                 await supabase.storage
@@ -333,7 +349,6 @@ class _ContractorRFPDetailsScreenState
                 final publicUrl = supabase.storage
                     .from('proposal_attachments')
                     .getPublicUrl(path);
-
                 criteriaFiles[criterionName]!.add({
                   'name': picked.name,
                   'bytes': fileBytes,
@@ -342,6 +357,7 @@ class _ContractorRFPDetailsScreenState
                 });
               }
               setSheetState(() {});
+              // FIX 3 & 4: إزالة ScaffoldMessenger المكررة
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -350,11 +366,12 @@ class _ContractorRFPDetailsScreenState
                     duration: Duration(seconds: 1),
                   ),
                 );
-              }
             } catch (e) {
+              // FIX 3 & 4: catch block نظيف بدون تكرار
               if (mounted) {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
               }
             } finally {
               setSheetState(() {
@@ -461,7 +478,9 @@ class _ContractorRFPDetailsScreenState
                     const SizedBox(height: 12),
                     ...criteria.map((criterionName) {
                       final files = criteriaFiles[criterionName] ?? [];
-                      final isLoadingThis = isUploadingFile &&
+                      // FIX 9: null-safe check لـ uploadingForCriterion
+                      final isLoadingThis =
+                          isUploadingFile &&
                           uploadingForCriterion == criterionName;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 16),
@@ -745,8 +764,8 @@ class _ContractorRFPDetailsScreenState
                                 }
                               } catch (e) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                        content: Text('Error: $e')));
+                                  SnackBar(content: Text('Error: $e')),
+                                );
                               } finally {
                                 setSheetState(
                                     () => isSubmitting = false);
