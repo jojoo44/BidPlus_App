@@ -17,8 +17,6 @@ class AINegotiationScreen extends StatefulWidget {
   final String rfpTitle;
   final dynamic budget;
   final bool isManager;
-  final String? rfpDescription;
-  final String? rfpScope;
 
   const AINegotiationScreen({
     super.key,
@@ -30,8 +28,6 @@ class AINegotiationScreen extends StatefulWidget {
     required this.rfpTitle,
     required this.isManager,
     this.budget,
-    this.rfpDescription,
-    this.rfpScope,
   });
 
   @override
@@ -55,11 +51,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
   bool _showAISuggestion = true;
   String _aiSuggestionText = '';
   String _sessionStatus = 'Active';
-
-  // ✅ جديد: تفاصيل المشروع تُجلب مباشرة من قاعدة البيانات
-  String _rfpDescription = '';
-  String _rfpScope = '';
-  String _rfpBudget = '';
 
   String? _contractId;
   String? _firstContractUrl;
@@ -134,23 +125,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           )
           .eq('sessionID', sessionId)
           .order('roundID', ascending: true);
-
-      // ✅ جلب تفاصيل المشروع من جدول RFP مباشرة
-      try {
-        final rfp = await supabase
-            .from('RFP')
-            .select('title, description, budget, requiredSpecialization')
-            .eq('rfpID', int.tryParse(widget.rfpId) ?? 0)
-            .maybeSingle();
-        if (rfp != null) {
-          _rfpDescription = rfp['description']?.toString() ?? '';
-          _rfpScope = rfp['requiredSpecialization']?.toString() ?? '';
-          _rfpBudget = rfp['budget']?.toString() ?? widget.budget?.toString() ?? '';
-        }
-      } catch (_) {
-        _rfpBudget = widget.budget?.toString() ?? '';
-      }
-
       try {
         final c = await supabase
             .from('Contract')
@@ -188,12 +162,15 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     }
   }
 
+  // ── FIX: مزامنة كاملة للرسائل والملفات ──
   void _subscribeRealtime() {
     final sidInt = int.tryParse(widget.sessionId) ?? 0;
+
     _channel = supabase
         .channel(
           'nego_${widget.sessionId}_${DateTime.now().millisecondsSinceEpoch}',
         )
+        // FIX 1: استقبال رسائل جديدة فوراً
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
@@ -202,11 +179,36 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             final row = p.newRecord;
             if (!mounted) return;
             final rowSid = row['sessionID']?.toString();
-            if (rowSid != widget.sessionId && rowSid != sidInt.toString()) return;
+            if (rowSid != widget.sessionId && rowSid != sidInt.toString())
+              return;
             final roundId = row['roundID']?.toString();
             if (_rounds.any((r) => r['roundID']?.toString() == roundId)) return;
             setState(() => _rounds.add(row));
             _scrollToBottom();
+          },
+        )
+        // FIX 2: استقبال تحديثات الرسائل (مثل إضافة fileURL)
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'NegoRounds',
+          callback: (p) {
+            final row = p.newRecord;
+            if (!mounted) return;
+            final rowSid = row['sessionID']?.toString();
+            if (rowSid != widget.sessionId && rowSid != sidInt.toString())
+              return;
+            final roundId = row['roundID']?.toString();
+            final idx = _rounds.indexWhere(
+              (r) => r['roundID']?.toString() == roundId,
+            );
+            if (idx != -1) {
+              setState(() => _rounds[idx] = row);
+            } else {
+              // لو ما موجود أضفه
+              setState(() => _rounds.add(row));
+              _scrollToBottom();
+            }
           },
         )
         .onPostgresChanges(
@@ -224,11 +226,12 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             }
           },
         )
+        // FIX 3: عند رفع ملف في Document — أعد تحميل الرسائل كاملة
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'Document',
-          callback: (p) {
+          callback: (p) async {
             final row = p.newRecord;
             final rowSession = row['sessionID']?.toString();
             final widgetSid = widget.sessionId;
@@ -238,20 +241,44 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
               return;
             final type = row['uploadType']?.toString() ?? '';
             if (type == 'Contract') {
-              setState(() {
-                _firstContractUrl = row['fileURL']?.toString();
-                _firstContractName = row['fullName']?.toString();
-                _firstContractUploader = row['uploadedBy']?.toString();
-              });
+              if (mounted)
+                setState(() {
+                  _firstContractUrl = row['fileURL']?.toString();
+                  _firstContractName = row['fullName']?.toString();
+                  _firstContractUploader = row['uploadedBy']?.toString();
+                });
             } else if (type == 'Contract_Signed') {
-              setState(() {
-                _signedContractUrl = row['fileURL']?.toString();
-                _signedContractName = row['fullName']?.toString();
-              });
+              if (mounted)
+                setState(() {
+                  _signedContractUrl = row['fileURL']?.toString();
+                  _signedContractName = row['fullName']?.toString();
+                });
             }
+            // FIX 3: أعد تحميل الرسائل لتحديث الملفات المرفقة في الشات
+            await _reloadRoundsOnly();
           },
         )
         .subscribe();
+  }
+
+  // FIX 3: تحديث الرسائل فقط بدون loading indicator
+  Future<void> _reloadRoundsOnly() async {
+    try {
+      final sessionId = int.tryParse(widget.sessionId) ?? widget.sessionId;
+      final rounds = await supabase
+          .from('NegoRounds')
+          .select(
+            'roundID,sessionID,rfp_id,proposal_id,manager_id,contractor_id,Terms,UpdateTerms,created_at,fileURL',
+          )
+          .eq('sessionID', sessionId)
+          .order('roundID', ascending: true);
+      if (mounted) {
+        setState(() {
+          _rounds = List<Map<String, dynamic>>.from(rounds);
+        });
+        _scrollToBottom();
+      }
+    } catch (_) {}
   }
 
   void _scrollToBottom() {
@@ -297,12 +324,10 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         'negotiate_suggest',
         body: {
           'title': widget.rfpTitle,
-          'budget': _rfpBudget.isNotEmpty ? _rfpBudget : widget.budget?.toString() ?? '',
+          'budget': widget.budget?.toString() ?? '',
           'history': history,
           'criteria': widget.selectedCriteria.join(', '),
           'isManager': widget.isManager,
-          'description': _rfpDescription, // ✅ من قاعدة البيانات مباشرة
-          'scope': _rfpScope,             // ✅ من قاعدة البيانات مباشرة
         },
       );
       if (mounted) {
@@ -312,7 +337,9 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _isGeneratingSuggestion = false);
@@ -346,7 +373,9 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _isGeneratingSuggestion = false);
@@ -366,8 +395,12 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         'Terms': text.trim(),
         'UpdateTerms': widget.isManager ? 'manager' : 'contractor',
       };
-      final rfpIdInt = widget.rfpId.isNotEmpty ? int.tryParse(widget.rfpId) : null;
-      final proposalIdInt = widget.proposalId.isNotEmpty ? int.tryParse(widget.proposalId) : null;
+      final rfpIdInt = widget.rfpId.isNotEmpty
+          ? int.tryParse(widget.rfpId)
+          : null;
+      final proposalIdInt = widget.proposalId.isNotEmpty
+          ? int.tryParse(widget.proposalId)
+          : null;
       if (rfpIdInt != null) data['rfp_id'] = rfpIdInt;
       if (proposalIdInt != null) data['proposal_id'] = proposalIdInt;
       if (widget.isManager) data['manager_id'] = userId;
@@ -379,7 +412,9 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -399,7 +434,8 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     setState(() => _isSending = true);
     try {
       final userId = supabase.auth.currentUser?.id;
-      final path = 'contracts/${widget.sessionId}_${widget.isManager ? "mgr" : "ctr"}_${_sanitizeFileName(file.name)}';
+      final path =
+          'contracts/${widget.sessionId}_${widget.isManager ? "mgr" : "ctr"}_${_sanitizeFileName(file.name)}';
       final url = await _uploadToStorage(path, file);
       final sessionId = await _resolveSessionId();
       final Map<String, dynamic> data = {
@@ -411,14 +447,21 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
       if (widget.isManager) data['manager_id'] = userId;
       if (!widget.isManager) data['contractor_id'] = userId;
       await supabase.from('NegoRounds').insert(data);
+      // FIX: أعد تحميل الرسائل فوراً بعد إرسال الملف
+      await _reloadRoundsOnly();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ File sent!'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('✅ File sent!'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -429,7 +472,9 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     if (_firstContractUrl != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('A contract is already uploaded. Delete it first to upload a new one.'),
+          content: Text(
+            'A contract is already uploaded. Delete it first to upload a new one.',
+          ),
           backgroundColor: Colors.orange,
         ),
       );
@@ -448,7 +493,8 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     try {
       final userId = supabase.auth.currentUser!.id;
       final uploaderRole = widget.isManager ? 'manager' : 'contractor';
-      final path = 'contracts/${widget.sessionId}_${uploaderRole}_original_${_sanitizeFileName(file.name)}';
+      final path =
+          'contracts/${widget.sessionId}_${uploaderRole}_original_${_sanitizeFileName(file.name)}';
       final url = await _uploadToStorage(path, file);
       final sidInt = int.tryParse(widget.sessionId) ?? 0;
       await supabase.from('Document').insert({
@@ -475,7 +521,10 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             .single();
         _contractId = row['id']?.toString();
       } else {
-        await supabase.from('Contract').update({'status': 'Pending_Signature'}).eq('id', _contractId!);
+        await supabase
+            .from('Contract')
+            .update({'status': 'Pending_Signature'})
+            .eq('id', _contractId!);
       }
       await _notifyOtherParty(
         'Contract Ready',
@@ -489,12 +538,17 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           _contractStatus = 'Pending_Signature';
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Contract sent to the other party!'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('✅ Contract sent to the other party!'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload error: $e')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Upload error: $e')));
       }
     } finally {
       if (mounted) setState(() => _isUploadingContract = false);
@@ -507,15 +561,26 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Contract?', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Delete Contract?',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         content: const Text(
           'This will remove the uploaded contract. You can upload a new one after.',
           style: TextStyle(color: Colors.grey, fontSize: 13, height: 1.5),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel', style: TextStyle(color: Colors.grey))),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
@@ -526,7 +591,11 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     setState(() => _isUploadingContract = true);
     try {
       final sidInt = int.tryParse(widget.sessionId) ?? 0;
-      await supabase.from('Document').delete().eq('uploadType', 'Contract').eq('sessionID', sidInt);
+      await supabase
+          .from('Document')
+          .delete()
+          .eq('uploadType', 'Contract')
+          .eq('sessionID', sidInt);
       if (mounted) {
         setState(() {
           _firstContractUrl = null;
@@ -535,11 +604,18 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           _contractStatus = '';
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Contract deleted. You can upload a new one.'), backgroundColor: Colors.orange),
+          const SnackBar(
+            content: Text('Contract deleted. You can upload a new one.'),
+            backgroundColor: Colors.orange,
+          ),
         );
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isUploadingContract = false);
     }
@@ -573,7 +649,8 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     try {
       final userId = supabase.auth.currentUser!.id;
       final uploaderRole = widget.isManager ? 'manager' : 'contractor';
-      final path = 'contracts/${widget.sessionId}_${uploaderRole}_signed_${_sanitizeFileName(file.name)}';
+      final path =
+          'contracts/${widget.sessionId}_${uploaderRole}_signed_${_sanitizeFileName(file.name)}';
       final url = await _uploadToStorage(path, file);
       final sidInt = int.tryParse(widget.sessionId) ?? 0;
       await supabase.from('Document').insert({
@@ -595,11 +672,18 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           _signedContractName = file.name;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Signed contract uploaded!'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('✅ Signed contract uploaded!'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload error: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Upload error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isUploadingContract = false);
     }
@@ -609,21 +693,43 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     if (_contractId == null) return;
     setState(() => _isUploadingContract = true);
     try {
-      final field = widget.isManager ? 'manager_finalized' : 'contractor_finalized';
-      await supabase.from('Contract').update({field: true}).eq('id', _contractId!);
+      final field = widget.isManager
+          ? 'manager_finalized'
+          : 'contractor_finalized';
+      await supabase
+          .from('Contract')
+          .update({field: true})
+          .eq('id', _contractId!);
       if (mounted) {
         setState(() {
           if (widget.isManager) _managerFinalized = true;
           if (!widget.isManager) _contractorFinalized = true;
         });
       }
-      final c = await supabase.from('Contract').select('manager_finalized,contractor_finalized').eq('id', _contractId!).single();
-      final both = c['manager_finalized'] == true && c['contractor_finalized'] == true;
+      final c = await supabase
+          .from('Contract')
+          .select('manager_finalized,contractor_finalized')
+          .eq('id', _contractId!)
+          .single();
+      final both =
+          c['manager_finalized'] == true && c['contractor_finalized'] == true;
       if (both) {
-        await supabase.from('Contract').update({'status': 'Active'}).eq('id', _contractId!);
+        await supabase
+            .from('Contract')
+            .update({'status': 'Active'})
+            .eq('id', _contractId!);
         final sid = int.tryParse(widget.sessionId) ?? widget.sessionId;
-        await supabase.from('NegoSession').update({'status': 'Completed', 'end_date': DateTime.now().toIso8601String()}).eq('session_id', sid);
-        await _notifyOtherParty('Contract Active', 'The contract for "${widget.rfpTitle}" is finalized by both parties. Project is now active!');
+        await supabase
+            .from('NegoSession')
+            .update({
+              'status': 'Completed',
+              'end_date': DateTime.now().toIso8601String(),
+            })
+            .eq('session_id', sid);
+        await _notifyOtherParty(
+          'Contract Active',
+          'The contract for "${widget.rfpTitle}" is finalized by both parties. Project is now active!',
+        );
         if (mounted) {
           setState(() {
             _contractStatus = 'Active';
@@ -632,19 +738,32 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             _contractorFinalized = true;
           });
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('🎉 Contract finalized! Project is now active.'), backgroundColor: Colors.green),
+            const SnackBar(
+              content: Text('🎉 Contract finalized! Project is now active.'),
+              backgroundColor: Colors.green,
+            ),
           );
         }
       } else {
-        await _notifyOtherParty('Finalize Contract', '${widget.isManager ? "Manager" : widget.contractorName} confirmed their part. Please finalize the contract.');
+        await _notifyOtherParty(
+          'Finalize Contract',
+          '${widget.isManager ? "Manager" : widget.contractorName} confirmed their part. Please finalize the contract.',
+        );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('✅ Waiting for the other party to confirm.'), backgroundColor: Colors.green),
+            const SnackBar(
+              content: Text('✅ Waiting for the other party to confirm.'),
+              backgroundColor: Colors.green,
+            ),
           );
         }
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _isUploadingContract = false);
     }
@@ -653,19 +772,32 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
   Future<void> _notifyOtherParty(String type, String message) async {
     try {
       final sid = int.tryParse(widget.sessionId) ?? 0;
-      final session = await supabase.from('NegoSession').select('rfp_id,contractor_id').eq('session_id', sid).maybeSingle();
+      final session = await supabase
+          .from('NegoSession')
+          .select('rfp_id,contractor_id')
+          .eq('session_id', sid)
+          .maybeSingle();
       if (session == null) return;
       final rfpId = session['rfp_id'];
       String? recipientId;
       if (widget.isManager) {
         recipientId = session['contractor_id']?.toString();
         if (recipientId == null && rfpId != null) {
-          final p = await supabase.from('proposals').select('submitterUserId').eq('RFP', rfpId).eq('status', 'Accepted').maybeSingle();
+          final p = await supabase
+              .from('proposals')
+              .select('submitterUserId')
+              .eq('RFP', rfpId)
+              .eq('status', 'Accepted')
+              .maybeSingle();
           recipientId = p?['submitterUserId']?.toString();
         }
       } else {
         if (rfpId != null) {
-          final rfp = await supabase.from('RFP').select('creatorUser').eq('rfpID', rfpId).maybeSingle();
+          final rfp = await supabase
+              .from('RFP')
+              .select('creatorUser')
+              .eq('rfpID', rfpId)
+              .maybeSingle();
           recipientId = rfp?['creatorUser']?.toString();
         }
       }
@@ -693,18 +825,26 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
 
   String _sanitizeFileName(String originalName) {
     final parts = originalName.split('.');
-    final ext = parts.length > 1 ? parts.last.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '') : 'pdf';
+    final ext = parts.length > 1
+        ? parts.last.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '')
+        : 'pdf';
     return '${DateTime.now().millisecondsSinceEpoch}.$ext';
   }
 
   Future<String> _uploadToStorage(String storagePath, PlatformFile file) async {
     if (kIsWeb) {
-      await supabase.storage.from('proposal_attachments').uploadBinary(storagePath, file.bytes!);
+      await supabase.storage
+          .from('proposal_attachments')
+          .uploadBinary(storagePath, file.bytes!);
     } else {
       final f = File(file.path!);
-      await supabase.storage.from('proposal_attachments').upload(storagePath, f, fileOptions: const FileOptions(upsert: true));
+      await supabase.storage
+          .from('proposal_attachments')
+          .upload(storagePath, f, fileOptions: const FileOptions(upsert: true));
     }
-    return supabase.storage.from('proposal_attachments').getPublicUrl(storagePath);
+    return supabase.storage
+        .from('proposal_attachments')
+        .getPublicUrl(storagePath);
   }
 
   @override
@@ -723,8 +863,22 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(widget.rfpTitle, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
-            Text('${widget.contractorName} • $_sessionStatus', style: TextStyle(color: isCompleted ? Colors.greenAccent : Colors.orangeAccent, fontSize: 11)),
+            Text(
+              widget.rfpTitle,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              '${widget.contractorName} • $_sessionStatus',
+              style: TextStyle(
+                color: isCompleted ? Colors.greenAccent : Colors.orangeAccent,
+                fontSize: 11,
+              ),
+            ),
           ],
         ),
       ),
@@ -737,18 +891,34 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                   if (widget.selectedCriteria.isNotEmpty)
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
                       color: surface,
                       child: Wrap(
                         spacing: 6,
                         runSpacing: 4,
-                        children: widget.selectedCriteria.map((c) => Chip(
-                          label: Text(c, style: const TextStyle(color: Colors.white, fontSize: 11)),
-                          backgroundColor: cardColor,
-                          side: const BorderSide(color: primaryBlue, width: 0.5),
-                          padding: EdgeInsets.zero,
-                          visualDensity: VisualDensity.compact,
-                        )).toList(),
+                        children: widget.selectedCriteria
+                            .map(
+                              (c) => Chip(
+                                label: Text(
+                                  c,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                                backgroundColor: cardColor,
+                                side: const BorderSide(
+                                  color: primaryBlue,
+                                  width: 0.5,
+                                ),
+                                padding: EdgeInsets.zero,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            )
+                            .toList(),
                       ),
                     ),
                   if (_showAISuggestion && !isCompleted)
@@ -759,16 +929,27 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                           if (_aiSuggestionText.isNotEmpty) {
                             _msgCtrl.text = _aiSuggestionText;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('✅ Suggestion added to message field'), backgroundColor: Colors.green, duration: Duration(seconds: 1)),
+                              const SnackBar(
+                                content: Text(
+                                  '✅ Suggestion added to message field',
+                                ),
+                                backgroundColor: Colors.green,
+                                duration: Duration(seconds: 1),
+                              ),
                             );
                           }
                         },
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: cardColor,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: primaryBlue.withOpacity(0.3)),
+                            border: Border.all(
+                              color: primaryBlue.withOpacity(0.3),
+                            ),
                           ),
                           child: Row(
                             children: [
@@ -776,21 +957,47 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text('AI SUGGESTION', style: TextStyle(color: primaryBlue, fontSize: 9, fontWeight: FontWeight.bold)),
+                                    const Text(
+                                      'AI SUGGESTION',
+                                      style: TextStyle(
+                                        color: primaryBlue,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                     const SizedBox(height: 2),
                                     _isGeneratingSuggestion
-                                        ? const Row(children: [
-                                            SizedBox(width: 10, height: 10, child: CircularProgressIndicator(color: primaryBlue, strokeWidth: 2)),
-                                            SizedBox(width: 6),
-                                            Text('Generating...', style: TextStyle(color: Colors.white54, fontSize: 11)),
-                                          ])
+                                        ? const Row(
+                                            children: [
+                                              SizedBox(
+                                                width: 10,
+                                                height: 10,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      color: primaryBlue,
+                                                      strokeWidth: 2,
+                                                    ),
+                                              ),
+                                              SizedBox(width: 6),
+                                              Text(
+                                                'Generating...',
+                                                style: TextStyle(
+                                                  color: Colors.white54,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                            ],
+                                          )
                                         : Text(
                                             _aiSuggestionText.isNotEmpty
                                                 ? _aiSuggestionText
                                                 : (widget.budget != null
-                                                    ? 'Suggest offering ${((widget.budget as num) * 0.95).toStringAsFixed(0)} SAR with 50% upfront.'
-                                                    : 'Press "Generate Suggestions" to get an AI recommendation.'),
-                                            style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                                      ? 'Suggest offering ${((widget.budget as num) * 0.95).toStringAsFixed(0)} SAR with 50% upfront.'
+                                                      : 'Press "Generate Suggestions" to get an AI recommendation.'),
+                                            style: const TextStyle(
+                                              color: Colors.white70,
+                                              fontSize: 11,
+                                            ),
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
                                           ),
@@ -798,8 +1005,13 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                                 ),
                               ),
                               GestureDetector(
-                                onTap: () => setState(() => _showAISuggestion = false),
-                                child: const Icon(Icons.close, color: Colors.white38, size: 14),
+                                onTap: () =>
+                                    setState(() => _showAISuggestion = false),
+                                child: const Icon(
+                                  Icons.close,
+                                  color: Colors.white38,
+                                  size: 14,
+                                ),
                               ),
                             ],
                           ),
@@ -815,44 +1027,81 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                         child: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: primaryBlue,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
-                          onPressed: _isGeneratingSuggestion ? null : _generateAISuggestion,
+                          onPressed: _isGeneratingSuggestion
+                              ? null
+                              : _generateAISuggestion,
                           icon: _isGeneratingSuggestion
-                              ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                              : const Icon(Icons.auto_awesome, color: Colors.white, size: 13),
-                          label: const Text('Generate Suggestions', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                              ? const SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.auto_awesome,
+                                  color: Colors.white,
+                                  size: 13,
+                                ),
+                          label: const Text(
+                            'Generate Suggestions',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   _buildContractSection(),
                   if (_contractActive)
-                    _buildBanner(Icons.check_circle, Colors.greenAccent, '🎉 Contract active! Project is now running.'),
+                    _buildBanner(
+                      Icons.check_circle,
+                      Colors.greenAccent,
+                      '🎉 Contract active! Project is now running.',
+                    ),
                 ],
               ),
             ),
           ),
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: primaryBlue))
+                ? const Center(
+                    child: CircularProgressIndicator(color: primaryBlue),
+                  )
                 : _rounds.isEmpty
-                    ? Center(child: Text(widget.isManager ? 'Start the negotiation' : 'Waiting for the manager to start...', style: TextStyle(color: Colors.white.withOpacity(0.4))))
-                    : ListView.builder(
-                        controller: _scrollCtrl,
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _rounds.length,
-                        itemBuilder: (_, i) {
-                          final r = _rounds[i];
-                          final isMe = widget.isManager ? r['UpdateTerms'] == 'manager' : r['UpdateTerms'] == 'contractor';
-                          return _ChatBubble(
-                            text: r['Terms']?.toString() ?? '',
-                            isMe: isMe,
-                            time: _fmtTime(r['created_at']),
-                            label: isMe ? 'You' : widget.contractorName,
-                            fileURL: r['fileURL']?.toString(),
-                          );
-                        },
-                      ),
+                ? Center(
+                    child: Text(
+                      widget.isManager
+                          ? 'Start the negotiation'
+                          : 'Waiting for the manager to start...',
+                      style: TextStyle(color: Colors.white.withOpacity(0.4)),
+                    ),
+                  )
+                : ListView.builder(
+                    controller: _scrollCtrl,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _rounds.length,
+                    itemBuilder: (_, i) {
+                      final r = _rounds[i];
+                      final isMe = widget.isManager
+                          ? r['UpdateTerms'] == 'manager'
+                          : r['UpdateTerms'] == 'contractor';
+                      return _ChatBubble(
+                        text: r['Terms']?.toString() ?? '',
+                        isMe: isMe,
+                        time: _fmtTime(r['created_at']),
+                        label: isMe ? 'You' : widget.contractorName,
+                        fileURL: r['fileURL']?.toString(),
+                      );
+                    },
+                  ),
           ),
           if (!isCompleted && !_contractActive)
             Container(
@@ -863,7 +1112,11 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                   CircleAvatar(
                     backgroundColor: cardColor,
                     child: IconButton(
-                      icon: const Icon(Icons.attach_file, color: Colors.white54, size: 18),
+                      icon: const Icon(
+                        Icons.attach_file,
+                        color: Colors.white54,
+                        size: 18,
+                      ),
                       onPressed: _isSending ? null : _sendFile,
                     ),
                   ),
@@ -880,8 +1133,14 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                         hintStyle: const TextStyle(color: Colors.grey),
                         filled: true,
                         fillColor: cardColor,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
                       ),
                     ),
                   ),
@@ -889,9 +1148,20 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                   CircleAvatar(
                     backgroundColor: primaryBlue,
                     child: _isSending
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
                         : IconButton(
-                            icon: const Icon(Icons.send, color: Colors.white, size: 18),
+                            icon: const Icon(
+                              Icons.send,
+                              color: Colors.white,
+                              size: 18,
+                            ),
                             onPressed: () => _sendMessage(_msgCtrl.text),
                           ),
                   ),
@@ -909,17 +1179,32 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         child: Container(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white12)),
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white12),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(children: [
-                Icon(Icons.upload_file, color: Colors.white54, size: 18),
-                SizedBox(width: 8),
-                Text('Attach Contract Document', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700)),
-              ]),
+              const Row(
+                children: [
+                  Icon(Icons.upload_file, color: Colors.white54, size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'Attach Contract Document',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 4),
-              const Text('Either party can attach the initial contract file.', style: TextStyle(color: Colors.white38, fontSize: 12)),
+              const Text(
+                'Either party can attach the initial contract file.',
+                style: TextStyle(color: Colors.white38, fontSize: 12),
+              ),
               const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
@@ -927,13 +1212,29 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.greenAccent.withOpacity(0.15),
                     foregroundColor: Colors.greenAccent,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: Colors.greenAccent, width: 0.5)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side: const BorderSide(
+                        color: Colors.greenAccent,
+                        width: 0.5,
+                      ),
+                    ),
                   ),
                   onPressed: _isUploadingContract ? null : _uploadFirstContract,
                   icon: _isUploadingContract
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.greenAccent, strokeWidth: 2))
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            color: Colors.greenAccent,
+                            strokeWidth: 2,
+                          ),
+                        )
                       : const Icon(Icons.attach_file, size: 18),
-                  label: const Text('Attach Contract File', style: TextStyle(fontWeight: FontWeight.bold)),
+                  label: const Text(
+                    'Attach Contract File',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ],
@@ -941,88 +1242,203 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         ),
       );
     }
+
     if (_iHaveUploaded && !_signedUploaded) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         child: Container(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: Colors.amber.withOpacity(0.08), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.amber.withOpacity(0.3))),
+          decoration: BoxDecoration(
+            color: Colors.amber.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.amber.withOpacity(0.3)),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () async { if (_firstContractUrl != null) await _openUrl(_firstContractUrl!); },
-                    child: _fileBox(_firstContractName ?? 'Contract', Colors.amber, showDownload: true),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () async {
+                        if (_firstContractUrl != null)
+                          await _openUrl(_firstContractUrl!);
+                      },
+                      child: _fileBox(
+                        _firstContractName ?? 'Contract',
+                        Colors.amber,
+                        showDownload: true,
+                      ),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: _isUploadingContract ? null : _deleteContract,
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.15), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.redAccent.withOpacity(0.4))),
-                    child: _isUploadingContract
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2))
-                        : const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _isUploadingContract ? null : _deleteContract,
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.redAccent.withOpacity(0.4),
+                        ),
+                      ),
+                      child: _isUploadingContract
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                color: Colors.redAccent,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.delete_outline,
+                              color: Colors.redAccent,
+                              size: 20,
+                            ),
+                    ),
                   ),
-                ),
-              ]),
+                ],
+              ),
               const SizedBox(height: 10),
-              const Row(children: [
-                Icon(Icons.hourglass_top, color: Colors.amber, size: 15),
-                SizedBox(width: 6),
-                Expanded(child: Text('Waiting for the other party to sign and re-upload.', style: TextStyle(color: Colors.amber, fontSize: 12))),
-              ]),
+              const Row(
+                children: [
+                  Icon(Icons.hourglass_top, color: Colors.amber, size: 15),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Waiting for the other party to sign and re-upload.',
+                      style: TextStyle(color: Colors.amber, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
       );
     }
+
     if (_otherUploaded && !_signedUploaded) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         child: Container(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.blue.withOpacity(0.3))),
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.blue.withOpacity(0.3)),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Row(children: [
-                Icon(Icons.description_outlined, color: Colors.lightBlueAccent, size: 18),
-                SizedBox(width: 8),
-                Text('Contract attached — review & sign', style: TextStyle(color: Colors.lightBlueAccent, fontWeight: FontWeight.w700)),
-              ]),
+              const Row(
+                children: [
+                  Icon(
+                    Icons.description_outlined,
+                    color: Colors.lightBlueAccent,
+                    size: 18,
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Contract attached — review & sign',
+                    style: TextStyle(
+                      color: Colors.lightBlueAccent,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 10),
               GestureDetector(
                 onTap: _downloadContract,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(color: Colors.lightBlueAccent.withOpacity(0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.lightBlueAccent.withOpacity(0.25))),
-                  child: Row(children: [
-                    const Icon(Icons.insert_drive_file, color: Colors.lightBlueAccent, size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(_firstContractName ?? 'Contract', style: const TextStyle(color: Colors.lightBlueAccent, fontSize: 13, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
-                      const Text('Tap to open & download', style: TextStyle(color: Colors.lightBlueAccent, fontSize: 10, fontStyle: FontStyle.italic)),
-                    ])),
-                    const Icon(Icons.download, color: Colors.lightBlueAccent, size: 20),
-                  ]),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.lightBlueAccent.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.lightBlueAccent.withOpacity(0.25),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.insert_drive_file,
+                        color: Colors.lightBlueAccent,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _firstContractName ?? 'Contract',
+                              style: const TextStyle(
+                                color: Colors.lightBlueAccent,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const Text(
+                              'Tap to open & download',
+                              style: TextStyle(
+                                color: Colors.lightBlueAccent,
+                                fontSize: 10,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(
+                        Icons.download,
+                        color: Colors.lightBlueAccent,
+                        size: 20,
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
-              const Text('Sign the document then upload the signed copy:', style: TextStyle(color: Colors.white38, fontSize: 12)),
+              const Text(
+                'Sign the document then upload the signed copy:',
+                style: TextStyle(color: Colors.white38, fontSize: 12),
+              ),
               const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF41C0FF), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                  onPressed: _isUploadingContract ? null : _uploadSignedContract,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF41C0FF),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: _isUploadingContract
+                      ? null
+                      : _uploadSignedContract,
                   icon: _isUploadingContract
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
                       : const Icon(Icons.upload_file, size: 18),
-                  label: const Text('Upload Signed Copy', style: TextStyle(fontWeight: FontWeight.bold)),
+                  label: const Text(
+                    'Upload Signed Copy',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ],
@@ -1030,44 +1446,98 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         ),
       );
     }
+
     if (_signedUploaded && !_contractActive) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         child: Container(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: Colors.green.withOpacity(0.08), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.green.withOpacity(0.3))),
+          decoration: BoxDecoration(
+            color: Colors.green.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.green.withOpacity(0.3)),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (_firstContractUrl != null) ...[
-                const Text('Original Contract', style: TextStyle(color: Colors.white38, fontSize: 11)),
+                const Text(
+                  'Original Contract',
+                  style: TextStyle(color: Colors.white38, fontSize: 11),
+                ),
                 const SizedBox(height: 4),
-                GestureDetector(onTap: _downloadContract, child: _fileBox(_firstContractName ?? 'Contract', Colors.white54, showDownload: true)),
+                GestureDetector(
+                  onTap: _downloadContract,
+                  child: _fileBox(
+                    _firstContractName ?? 'Contract',
+                    Colors.white54,
+                    showDownload: true,
+                  ),
+                ),
                 const SizedBox(height: 10),
               ],
-              const Text('Signed Copy', style: TextStyle(color: Colors.greenAccent, fontSize: 11)),
+              const Text(
+                'Signed Copy',
+                style: TextStyle(color: Colors.greenAccent, fontSize: 11),
+              ),
               const SizedBox(height: 4),
               GestureDetector(
-                onTap: () async { if (_signedContractUrl != null) await _openUrl(_signedContractUrl!); },
-                child: _fileBox(_signedContractName ?? 'Signed Contract', Colors.greenAccent, showDownload: true),
+                onTap: () async {
+                  if (_signedContractUrl != null)
+                    await _openUrl(_signedContractUrl!);
+                },
+                child: _fileBox(
+                  _signedContractName ?? 'Signed Contract',
+                  Colors.greenAccent,
+                  showDownload: true,
+                ),
               ),
               const Divider(color: Colors.white12, height: 20),
-              Row(children: [_finalizeChip('Manager', _managerFinalized), const SizedBox(width: 8), _finalizeChip('Contractor', _contractorFinalized)]),
+              Row(
+                children: [
+                  _finalizeChip('Manager', _managerFinalized),
+                  const SizedBox(width: 8),
+                  _finalizeChip('Contractor', _contractorFinalized),
+                ],
+              ),
               const SizedBox(height: 10),
               if (!_myFinalized)
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.green, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                     onPressed: _isUploadingContract ? null : _finalizeContract,
                     icon: _isUploadingContract
-                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
                         : const Icon(Icons.lock, size: 18, color: Colors.white),
-                    label: const Text('Confirm & Finalize Contract', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    label: const Text(
+                      'Confirm & Finalize Contract',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 )
               else
-                const Center(child: Text('Waiting for the other party to confirm...', style: TextStyle(color: Colors.white54, fontSize: 13))),
+                const Center(
+                  child: Text(
+                    'Waiting for the other party to confirm...',
+                    style: TextStyle(color: Colors.white54, fontSize: 13),
+                  ),
+                ),
             ],
           ),
         ),
@@ -1076,29 +1546,63 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
     return const SizedBox.shrink();
   }
 
-  Widget _fileBox(String name, Color color, {bool showDownload = false}) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    decoration: BoxDecoration(color: color.withOpacity(0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: color.withOpacity(0.25))),
-    child: Row(children: [
-      Icon(Icons.insert_drive_file, color: color, size: 20),
-      const SizedBox(width: 10),
-      Expanded(child: Text(name, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis)),
-      if (showDownload) Icon(Icons.download, color: color, size: 16),
-    ]),
-  );
+  Widget _fileBox(String name, Color color, {bool showDownload = false}) =>
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withOpacity(0.25)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.insert_drive_file, color: color, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                name,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (showDownload) Icon(Icons.download, color: color, size: 16),
+          ],
+        ),
+      );
 
   Widget _statusChip(String label, bool done) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
     decoration: BoxDecoration(
-      color: done ? Colors.green.withOpacity(0.2) : Colors.white.withOpacity(0.05),
+      color: done
+          ? Colors.green.withOpacity(0.2)
+          : Colors.white.withOpacity(0.05),
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: done ? Colors.greenAccent.withOpacity(0.5) : Colors.white24),
+      border: Border.all(
+        color: done ? Colors.greenAccent.withOpacity(0.5) : Colors.white24,
+      ),
     ),
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(done ? Icons.check : Icons.hourglass_empty, size: 12, color: done ? Colors.greenAccent : Colors.white38),
-      const SizedBox(width: 4),
-      Text(label, style: TextStyle(color: done ? Colors.greenAccent : Colors.white38, fontSize: 11)),
-    ]),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          done ? Icons.check : Icons.hourglass_empty,
+          size: 12,
+          color: done ? Colors.greenAccent : Colors.white38,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: done ? Colors.greenAccent : Colors.white38,
+            fontSize: 11,
+          ),
+        ),
+      ],
+    ),
   );
 
   Widget _finalizeChip(String label, bool done) => _statusChip(label, done);
@@ -1106,12 +1610,27 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
   Widget _buildBanner(IconData icon, Color color, String text) => Container(
     margin: const EdgeInsets.all(12),
     padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withOpacity(0.3))),
-    child: Row(children: [
-      Icon(icon, color: color, size: 18),
-      const SizedBox(width: 10),
-      Expanded(child: Text(text, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w600))),
-    ]),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.1),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: color.withOpacity(0.3)),
+    ),
+    child: Row(
+      children: [
+        Icon(icon, color: color, size: 18),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    ),
   );
 }
 
@@ -1119,12 +1638,22 @@ class _ChatBubble extends StatelessWidget {
   final String text, time, label;
   final bool isMe;
   final String? fileURL;
-  const _ChatBubble({required this.text, required this.isMe, required this.time, required this.label, this.fileURL});
+  const _ChatBubble({
+    required this.text,
+    required this.isMe,
+    required this.time,
+    required this.label,
+    this.fileURL,
+  });
 
   bool get _isImage {
     if (fileURL == null) return false;
     final url = fileURL!.toLowerCase().split('?').first;
-    return url.endsWith('.jpg') || url.endsWith('.jpeg') || url.endsWith('.png') || url.endsWith('.gif') || url.endsWith('.webp');
+    return url.endsWith('.jpg') ||
+        url.endsWith('.jpeg') ||
+        url.endsWith('.png') ||
+        url.endsWith('.gif') ||
+        url.endsWith('.webp');
   }
 
   bool get _isFile => fileURL != null && fileURL!.isNotEmpty;
@@ -1138,43 +1667,105 @@ class _ChatBubble extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         constraints: BoxConstraints(maxWidth: screenWidth * 0.75),
         child: Column(
-          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment: isMe
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
           children: [
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10))),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                label,
+                style: const TextStyle(color: Colors.white38, fontSize: 10),
+              ),
+            ),
             const SizedBox(height: 3),
             GestureDetector(
-              onTap: _isFile ? () async {
-                try { await launchUrl(Uri.parse(fileURL!), mode: LaunchMode.externalApplication); }
-                catch (_) { try { await launchUrl(Uri.parse(fileURL!), mode: LaunchMode.platformDefault); } catch (_) {} }
-              } : null,
+              onTap: _isFile
+                  ? () async {
+                      try {
+                        await launchUrl(
+                          Uri.parse(fileURL!),
+                          mode: LaunchMode.externalApplication,
+                        );
+                      } catch (_) {
+                        try {
+                          await launchUrl(
+                            Uri.parse(fileURL!),
+                            mode: LaunchMode.platformDefault,
+                          );
+                        } catch (_) {}
+                      }
+                    }
+                  : null,
               child: Container(
                 decoration: BoxDecoration(
-                  color: isMe ? const Color(0xFF3395FF) : const Color(0xFF1C242F),
+                  color: isMe
+                      ? const Color(0xFF3395FF)
+                      : const Color(0xFF1C242F),
                   borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(16), topRight: const Radius.circular(16),
-                    bottomLeft: Radius.circular(isMe ? 16 : 4), bottomRight: Radius.circular(isMe ? 4 : 16),
+                    topLeft: const Radius.circular(16),
+                    topRight: const Radius.circular(16),
+                    bottomLeft: Radius.circular(isMe ? 16 : 4),
+                    bottomRight: Radius.circular(isMe ? 4 : 16),
                   ),
                 ),
                 child: _isImage
                     ? ClipRRect(
-                        borderRadius: BorderRadius.only(topLeft: const Radius.circular(16), topRight: const Radius.circular(16), bottomLeft: Radius.circular(isMe ? 16 : 4), bottomRight: Radius.circular(isMe ? 4 : 16)),
-                        child: Image.network(fileURL!, width: screenWidth * 0.65, fit: BoxFit.cover,
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(16),
+                          topRight: const Radius.circular(16),
+                          bottomLeft: Radius.circular(isMe ? 16 : 4),
+                          bottomRight: Radius.circular(isMe ? 4 : 16),
+                        ),
+                        child: Image.network(
+                          fileURL!,
+                          width: screenWidth * 0.65,
+                          fit: BoxFit.cover,
                           loadingBuilder: (ctx, child, progress) {
                             if (progress == null) return child;
-                            return Container(width: screenWidth * 0.65, height: 140, color: Colors.white10, child: const Center(child: CircularProgressIndicator(color: Colors.white54, strokeWidth: 2)));
+                            return Container(
+                              width: screenWidth * 0.65,
+                              height: 140,
+                              color: Colors.white10,
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  color: Colors.white54,
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            );
                           },
                           errorBuilder: (_, __, ___) => _fileTile(screenWidth),
                         ),
                       )
-                    : _isFile ? _fileTile(screenWidth)
+                    : _isFile
+                    ? _fileTile(screenWidth)
                     : Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.4), softWrap: true, overflow: TextOverflow.visible),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        child: Text(
+                          text,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            height: 1.4,
+                          ),
+                          softWrap: true,
+                          overflow: TextOverflow.visible,
+                        ),
                       ),
               ),
             ),
             const SizedBox(height: 3),
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: Text(time, style: const TextStyle(color: Colors.white38, fontSize: 10))),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                time,
+                style: const TextStyle(color: Colors.white38, fontSize: 10),
+              ),
+            ),
           ],
         ),
       ),
@@ -1182,33 +1773,82 @@ class _ChatBubble extends StatelessWidget {
   }
 
   Widget _fileTile(double screenWidth) {
-    final fileName = text.replaceFirst('📎 ', '').trim().isNotEmpty ? text.replaceFirst('📎 ', '').trim() : (fileURL ?? '').split('/').last.split('?').first;
+    final fileName = text.replaceFirst('📎 ', '').trim().isNotEmpty
+        ? text.replaceFirst('📎 ', '').trim()
+        : (fileURL ?? '').split('/').last.split('?').first;
     final ext = fileName.split('.').last.toLowerCase();
     IconData icon;
     Color iconColor;
-    if (ext == 'pdf') { icon = Icons.picture_as_pdf; iconColor = Colors.redAccent; }
-    else if (['doc', 'docx'].contains(ext)) { icon = Icons.description; iconColor = Colors.blueAccent; }
-    else { icon = Icons.insert_drive_file; iconColor = Colors.white70; }
+    if (ext == 'pdf') {
+      icon = Icons.picture_as_pdf;
+      iconColor = Colors.redAccent;
+    } else if (['doc', 'docx'].contains(ext)) {
+      icon = Icons.description;
+      iconColor = Colors.blueAccent;
+    } else {
+      icon = Icons.insert_drive_file;
+      iconColor = Colors.white70;
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: iconColor.withOpacity(0.15), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: iconColor, size: 22)),
-        const SizedBox(width: 10),
-        Flexible(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(fileName, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis, maxLines: 2),
-          const SizedBox(height: 2),
-          const Row(children: [Icon(Icons.touch_app, color: Colors.white38, size: 10), SizedBox(width: 3), Text('Tap to open', style: TextStyle(color: Colors.white38, fontSize: 10))]),
-        ])),
-        const SizedBox(width: 8),
-        const Icon(Icons.open_in_new, color: Colors.white38, size: 14),
-      ]),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: iconColor, size: 22),
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  fileName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 2),
+                const Row(
+                  children: [
+                    Icon(Icons.touch_app, color: Colors.white38, size: 10),
+                    SizedBox(width: 3),
+                    Text(
+                      'Tap to open',
+                      style: TextStyle(color: Colors.white38, fontSize: 10),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.open_in_new, color: Colors.white38, size: 14),
+        ],
+      ),
     );
   }
 }
 
 class AIContractReviewScreen extends StatefulWidget {
   final String contractorName, proposalId, finalPrice, duration, terms;
-  const AIContractReviewScreen({super.key, required this.contractorName, required this.proposalId, this.finalPrice = '', this.duration = '', this.terms = ''});
+  const AIContractReviewScreen({
+    super.key,
+    required this.contractorName,
+    required this.proposalId,
+    this.finalPrice = '',
+    this.duration = '',
+    this.terms = '',
+  });
   @override
   State<AIContractReviewScreen> createState() => _AIContractReviewScreenState();
 }
@@ -1224,48 +1864,98 @@ class _AIContractReviewScreenState extends State<AIContractReviewScreen> {
   }
 
   @override
-  void dispose() { _priceCtrl.dispose(); _durationCtrl.dispose(); _termsCtrl.dispose(); super.dispose(); }
+  void dispose() {
+    _priceCtrl.dispose();
+    _durationCtrl.dispose();
+    _termsCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0D1219),
-      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0, title: const Text('Review Contract Terms', style: TextStyle(color: Colors.white))),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          'Review Contract Terms',
+          style: TextStyle(color: Colors.white),
+        ),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Review and confirm the terms extracted by AI from the negotiation history.', style: TextStyle(color: Colors.grey, fontSize: 14)),
-          const SizedBox(height: 30),
-          _field('Final Agreed Price (SAR)', _priceCtrl, Icons.monetization_on),
-          const SizedBox(height: 20),
-          _field('Project Duration', _durationCtrl, Icons.timer),
-          const SizedBox(height: 20),
-          _field('Contract Clauses', _termsCtrl, Icons.article, maxLines: 5),
-          const SizedBox(height: 40),
-          SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF3395FF), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => FinalizeContractScreen(
-                contractTitle: 'Final Project Contract',
-                contractId: widget.proposalId,
-                managerName: 'Project Manager',
-                contractorName: widget.contractorName,
-                effectiveDate: DateTime.now().toString().split(' ')[0],
-              ))),
-              child: const Text('Finalize Contract', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Review and confirm the terms extracted by AI from the negotiation history.',
+              style: TextStyle(color: Colors.grey, fontSize: 14),
             ),
-          ),
-        ]),
+            const SizedBox(height: 30),
+            _field(
+              'Final Agreed Price (SAR)',
+              _priceCtrl,
+              Icons.monetization_on,
+            ),
+            const SizedBox(height: 20),
+            _field('Project Duration', _durationCtrl, Icons.timer),
+            const SizedBox(height: 20),
+            _field('Contract Clauses', _termsCtrl, Icons.article, maxLines: 5),
+            const SizedBox(height: 40),
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF3395FF),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => FinalizeContractScreen(
+                      contractTitle: 'Final Project Contract',
+                      contractId: widget.proposalId,
+                      managerName: 'Project Manager',
+                      contractorName: widget.contractorName,
+                      effectiveDate: DateTime.now().toString().split(' ')[0],
+                    ),
+                  ),
+                ),
+                child: const Text(
+                  'Finalize Contract',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _field(String label, TextEditingController ctrl, IconData icon, {int maxLines = 1}) => Column(
+  Widget _field(
+    String label,
+    TextEditingController ctrl,
+    IconData icon, {
+    int maxLines = 1,
+  }) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Text(label, style: const TextStyle(color: Color(0xFF3395FF), fontWeight: FontWeight.bold, fontSize: 14)),
+      Text(
+        label,
+        style: const TextStyle(
+          color: Color(0xFF3395FF),
+          fontWeight: FontWeight.bold,
+          fontSize: 14,
+        ),
+      ),
       const SizedBox(height: 10),
       TextField(
         controller: ctrl,
@@ -1275,8 +1965,14 @@ class _AIContractReviewScreenState extends State<AIContractReviewScreen> {
           prefixIcon: Icon(icon, color: Colors.grey, size: 20),
           filled: true,
           fillColor: const Color(0xFF1C242F),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white10)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF3395FF))),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.white10),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF3395FF)),
+          ),
         ),
       ),
     ],
