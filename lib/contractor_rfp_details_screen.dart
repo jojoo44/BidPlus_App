@@ -4,7 +4,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -12,215 +11,32 @@ import '../main.dart';
 import 'final_total_score_screen.dart';
 import 'contractor_proposal_details_screen.dart';
 
-String get _openAiApiKey {
-  final key = const String.fromEnvironment('OPENAI_API_KEY', defaultValue: '');
-  if (key.isEmpty) {
-    throw Exception('OPENAI_API_KEY not set!');
-  }
-  return key;
-}
-
-Future<String?> _uploadFileToOpenAI(
-  Uint8List fileBytes,
-  String fileName,
-) async {
-  try {
-    final request = http.MultipartRequest(
-      'POST',
-      Uri.parse('https://api.openai.com/v1/files'),
-    );
-    request.headers['Authorization'] = 'Bearer $_openAiApiKey';
-    request.files.add(
-      http.MultipartFile.fromBytes('file', fileBytes, filename: fileName),
-    );
-    request.fields['purpose'] = 'assistants';
-    final response = await request.send();
-    final body = await response.stream.bytesToString();
-    if (response.statusCode != 200) return null;
-    return jsonDecode(body)['id'] as String?;
-  } catch (e) {
-    return null;
-  }
-}
-
+// ✅ يرسل fileUrl للـ Edge Function التي تحمل الملف وترسله لـ GPT-4o
 Future<int> _evaluateSingleFile({
-  required Uint8List fileBytes,
+  required String fileUrl,
   required String fileName,
   required String criterionName,
   required String rfpDescription,
 }) async {
-  String? fileId;
-  String? assistantId;
-  String? vsId;
   try {
-    fileId = await _uploadFileToOpenAI(fileBytes, fileName);
-    if (fileId == null) return 0;
-
-    final vsRes = await http.post(
-      Uri.parse('https://api.openai.com/v1/vector_stores'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $_openAiApiKey',
-        'OpenAI-Beta': 'assistants=v2',
-      },
-      body: jsonEncode({
-        'name': 'proposal_${DateTime.now().millisecondsSinceEpoch}',
-      }),
-    );
-    if (vsRes.statusCode != 200) return 0;
-    vsId = jsonDecode(vsRes.body)['id'] as String;
-
-    await http.post(
-      Uri.parse('https://api.openai.com/v1/vector_stores/$vsId/files'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $_openAiApiKey',
-        'OpenAI-Beta': 'assistants=v2',
-      },
-      body: jsonEncode({'file_id': fileId}),
-    );
-    await Future.delayed(const Duration(seconds: 4));
-
-    final assistantRes = await http.post(
-      Uri.parse('https://api.openai.com/v1/assistants'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $_openAiApiKey',
-        'OpenAI-Beta': 'assistants=v2',
-      },
-      body: jsonEncode({
-        'model': 'gpt-4o',
-        'tools': [
-          {'type': 'file_search'},
-        ],
-        'tool_resources': {
-          'file_search': {
-            'vector_store_ids': [vsId],
-          },
-        },
-        'instructions':
-            'You are a strict document evaluator. Always reply with only one number.',
-      }),
-    );
-    if (assistantRes.statusCode != 200) return 0;
-    assistantId = jsonDecode(assistantRes.body)['id'] as String;
-
-    final prompt =
-        '''
-You are an EXTREMELY STRICT document evaluator for RFP proposals.
-RFP Description: $rfpDescription
-Required Criterion: "$criterionName"
-READ THE ATTACHED DOCUMENT CAREFULLY and evaluate if it DIRECTLY proves the "$criterionName" criterion.
-SCORING: 0=Wrong/not related, 20=Very weak, 40=Poor, 60=Satisfactory, 80=Good, 100=Excellent
-Reply with ONLY ONE number: 0, 20, 40, 60, 80, or 100
-''';
-
-    final threadRes = await http.post(
-      Uri.parse('https://api.openai.com/v1/threads'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $_openAiApiKey',
-        'OpenAI-Beta': 'assistants=v2',
-      },
-      body: jsonEncode({
-        'messages': [
-          {'role': 'user', 'content': prompt},
-        ],
-      }),
-    );
-    if (threadRes.statusCode != 200) return 0;
-    final threadId = jsonDecode(threadRes.body)['id'] as String;
-
-    final runRes = await http.post(
-      Uri.parse('https://api.openai.com/v1/threads/$threadId/runs'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $_openAiApiKey',
-        'OpenAI-Beta': 'assistants=v2',
-      },
-      body: jsonEncode({'assistant_id': assistantId}),
-    );
-    if (runRes.statusCode != 200) return 0;
-    final runId = jsonDecode(runRes.body)['id'] as String;
-
-    String runStatus = 'queued';
-    int attempts = 0;
-    while (runStatus != 'completed' && runStatus != 'failed' && attempts < 30) {
-      await Future.delayed(const Duration(seconds: 2));
-      final statusRes = await http.get(
-        Uri.parse('https://api.openai.com/v1/threads/$threadId/runs/$runId'),
-        headers: {
-          'Authorization': 'Bearer $_openAiApiKey',
-          'OpenAI-Beta': 'assistants=v2',
-        },
-      );
-      runStatus = jsonDecode(statusRes.body)['status'] as String;
-      attempts++;
-    }
-    if (runStatus != 'completed') return 0;
-
-    final messagesRes = await http.get(
-      Uri.parse('https://api.openai.com/v1/threads/$threadId/messages'),
-      headers: {
-        'Authorization': 'Bearer $_openAiApiKey',
-        'OpenAI-Beta': 'assistants=v2',
+    debugPrint('🔍 Evaluating: $fileName | criterion: $criterionName');
+    final response = await supabase.functions.invoke(
+      'evaluate-proposal',
+      body: {
+        'fileUrl': fileUrl,
+        'fileName': fileName,
+        'criterionName': criterionName,
+        'rfpDescription': rfpDescription,
       },
     );
-    final messages = jsonDecode(messagesRes.body)['data'] as List;
-    final assistantMsg = messages.firstWhere(
-      (m) => m['role'] == 'assistant',
-      orElse: () => null,
-    );
-    if (assistantMsg == null) return 0;
-    final content = assistantMsg['content'] as List;
-    final textBlock = content.firstWhere(
-      (c) => c['type'] == 'text',
-      orElse: () => null,
-    );
-    if (textBlock == null) return 0;
-    final responseText = (textBlock['text']['value'] as String).trim();
-    final cleaned = responseText.replaceAll(RegExp(r'[^0-9]'), '');
-    final score =
-        int.tryParse(
-          cleaned.isEmpty
-              ? '0'
-              : cleaned.substring(0, cleaned.length.clamp(0, 3)),
-        ) ??
-        0;
+    final data = response.data as Map<String, dynamic>?;
+    debugPrint('📨 Edge Function response: $data');
+    final score = data?['score'] as int? ?? 0;
+    debugPrint('🏆 Score for $criterionName ($fileName): $score');
     return [0, 20, 40, 60, 80, 100].contains(score) ? score : 0;
   } catch (e) {
+    debugPrint('❌ Edge Function error: $e');
     return 0;
-  } finally {
-    if (fileId != null) {
-      try {
-        await http.delete(
-          Uri.parse('https://api.openai.com/v1/files/$fileId'),
-          headers: {'Authorization': 'Bearer $_openAiApiKey'},
-        );
-      } catch (_) {}
-    }
-    if (vsId != null) {
-      try {
-        await http.delete(
-          Uri.parse('https://api.openai.com/v1/vector_stores/$vsId'),
-          headers: {
-            'Authorization': 'Bearer $_openAiApiKey',
-            'OpenAI-Beta': 'assistants=v2',
-          },
-        );
-      } catch (_) {}
-    }
-    if (assistantId != null) {
-      try {
-        await http.delete(
-          Uri.parse('https://api.openai.com/v1/assistants/$assistantId'),
-          headers: {
-            'Authorization': 'Bearer $_openAiApiKey',
-            'OpenAI-Beta': 'assistants=v2',
-          },
-        );
-      } catch (_) {}
-    }
   }
 }
 
@@ -229,11 +45,14 @@ Future<int> _evaluateCriterionFiles({
   required String criterionName,
   required String rfpDescription,
 }) async {
-  if (files.isEmpty) return 0;
+  if (files.isEmpty) {
+    debugPrint('⚠️ No files for: $criterionName');
+    return 0;
+  }
   int totalScore = 0;
   for (final file in files) {
     totalScore += await _evaluateSingleFile(
-      fileBytes: file['bytes'] as Uint8List,
+      fileUrl: file['url'] as String,
       fileName: file['name'] as String,
       criterionName: criterionName,
       rfpDescription: rfpDescription,
@@ -248,38 +67,63 @@ Future<Map<String, dynamic>> _computeAiScoreWithDetails({
   required String evaluationCriteria,
 }) async {
   try {
-    if (evaluationCriteria.isEmpty) {
+    debugPrint('📊 evaluationCriteria from DB: "$evaluationCriteria"');
+    debugPrint('📁 criteriaFiles keys: ${criteriaFiles.keys.toList()}');
+
+    if (evaluationCriteria.trim().isEmpty) {
+      debugPrint('❌ evaluationCriteria is empty!');
       return {'finalScore': 0, 'criteriaScores': <String, int>{}};
     }
+
     final weights = <String, double>{};
     for (final part in evaluationCriteria.split(',')) {
-      final kv = part.trim().split(':');
-      if (kv.length >= 2) {
-        final name = kv[0].trim();
-        final weight =
-            (double.tryParse(kv[1].trim().replaceAll('%', '')) ?? 0) / 100;
-        if (weight > 0) weights[name] = weight;
-      }
+      final trimmed = part.trim();
+      final colonIdx = trimmed.indexOf(':');
+      if (colonIdx == -1) continue;
+      final name = trimmed.substring(0, colonIdx).trim();
+      final rawWeight = trimmed
+          .substring(colonIdx + 1)
+          .trim()
+          .replaceAll('%', '')
+          .trim();
+      final weight = (double.tryParse(rawWeight) ?? 0) / 100;
+      debugPrint('⚖️ "$name" | raw="$rawWeight" | weight=$weight');
+      if (weight > 0) weights[name] = weight;
     }
+
     if (weights.isEmpty) {
+      debugPrint('❌ No valid weights parsed!');
       return {'finalScore': 0, 'criteriaScores': <String, int>{}};
     }
+
+    debugPrint('✅ Parsed weights: $weights');
+
     final criteriaScores = <String, int>{};
     double total = 0;
     for (final entry in weights.entries) {
+      final matchingKey = criteriaFiles.keys.firstWhere(
+        (k) => k.trim().toLowerCase() == entry.key.trim().toLowerCase(),
+        orElse: () => entry.key,
+      );
       final score = await _evaluateCriterionFiles(
-        files: criteriaFiles[entry.key] ?? [],
+        files: criteriaFiles[matchingKey] ?? [],
         criterionName: entry.key,
         rfpDescription: rfpDescription,
       );
       criteriaScores[entry.key] = score;
       total += score * entry.value;
+      debugPrint(
+          '📈 ${entry.key}: score=$score × weight=${entry.value} = ${score * entry.value}');
     }
+
+    final finalScore = total.round().clamp(0, 100);
+    debugPrint('🎯 FINAL SCORE: $finalScore');
     return {
-      'finalScore': total.round().clamp(0, 100),
+      'finalScore': finalScore,
       'criteriaScores': criteriaScores,
     };
   } catch (e) {
+    debugPrint('❌ _computeAiScoreWithDetails error: $e');
     return {'finalScore': 0, 'criteriaScores': <String, int>{}};
   }
 }
@@ -380,7 +224,6 @@ class _ContractorRFPDetailsScreenState
     } catch (_) {}
   }
 
-  // FIX 1: إغلاق _openFile بشكل صحيح
   Future<void> _openFile(String url) async {
     if (url.isEmpty) return;
     try {
@@ -390,43 +233,36 @@ class _ContractorRFPDetailsScreenState
         await launchUrl(Uri.parse(url), mode: LaunchMode.platformDefault);
       } catch (_) {
         if (mounted)
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Cannot open file')));
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Cannot open file')));
       }
-    }
-  } // FIX 1: القوس كان ناقصاً هنا
-
-  // FIX 2: _openPickedFile خارج _openFile الآن
-  Future<void> _openPickedFile(Map<String, dynamic> fileData) async {
-    final url = fileData['url'] as String? ?? '';
-    final localPath = fileData['localPath'] as String? ?? '';
-    if (url.isNotEmpty) {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-        return;
-      }
-    }
-    if (localPath.isNotEmpty && File(localPath).existsSync()) {
-      final uri = Uri.file(localPath);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-        return;
-      }
-    }
-    if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Cannot open file')));
     }
   }
+
+  Future<void> _openPickedFile(Map<String, dynamic> fileData) async {
+  final url = fileData['url'] as String? ?? '';
+  if (url.isNotEmpty) {
+    final uri = Uri.parse(url);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return;
+    } catch (_) {
+      try {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+        return;
+      } catch (_) {}
+    }
+  }
+  if (mounted) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Cannot open file')));
+  }
+}
 
   void _showSubmitProposalSheet() {
     final priceController = TextEditingController();
     final descController = TextEditingController();
     final Map<String, List<Map<String, dynamic>>> criteriaFiles = {};
-    // FIX 8 & 9: تعريف صحيح مع nullable
     bool isSubmitting = false;
     bool isUploadingFile = false;
     String? uploadingForCriterion;
@@ -446,7 +282,7 @@ class _ContractorRFPDetailsScreenState
             final result = await FilePicker.platform.pickFiles(
               type: FileType.custom,
               allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg', 'docx', 'doc'],
-              withData: kIsWeb,
+              withData: true,
               allowMultiple: true,
             );
             if (result == null || result.files.isEmpty) return;
@@ -476,16 +312,15 @@ class _ContractorRFPDetailsScreenState
                 if (fileBytes == null || fileBytes.isEmpty) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Could not read: ${picked.name}')),
+                      SnackBar(
+                          content: Text('Could not read: ${picked.name}')),
                     );
                   }
                   continue;
                 }
 
-                final sanitized = picked.name.replaceAll(
-                  RegExp(r'[^\w\.\-]'),
-                  '_',
-                );
+                final sanitized =
+                    picked.name.replaceAll(RegExp(r'[^\w\.\-]'), '_');
                 final path =
                     'proposals/$userId/${DateTime.now().millisecondsSinceEpoch}_$sanitized';
                 await supabase.storage
@@ -507,7 +342,6 @@ class _ContractorRFPDetailsScreenState
                 });
               }
               setSheetState(() {});
-              // FIX 3 & 4: إزالة ScaffoldMessenger المكررة
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -518,11 +352,9 @@ class _ContractorRFPDetailsScreenState
                 );
               }
             } catch (e) {
-              // FIX 3 & 4: catch block نظيف بدون تكرار
               if (mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+                ScaffoldMessenger.of(context)
+                    .showSnackBar(SnackBar(content: Text('Upload failed: $e')));
               }
             } finally {
               setSheetState(() {
@@ -532,10 +364,8 @@ class _ContractorRFPDetailsScreenState
             }
           }
 
-          final totalUploaded = criteriaFiles.values.fold(
-            0,
-            (sum, list) => sum + list.length,
-          );
+          final totalUploaded = criteriaFiles.values
+              .fold(0, (sum, list) => sum + list.length);
 
           return Padding(
             padding: EdgeInsets.only(
@@ -569,10 +399,8 @@ class _ContractorRFPDetailsScreenState
                     ),
                   ),
                   const SizedBox(height: 20),
-                  const Text(
-                    'Your Price (SAR)',
-                    style: TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
+                  const Text('Your Price (SAR)',
+                      style: TextStyle(color: Colors.white70, fontSize: 13)),
                   const SizedBox(height: 8),
                   TextField(
                     controller: priceController,
@@ -583,11 +411,8 @@ class _ContractorRFPDetailsScreenState
                       hintStyle: const TextStyle(color: Colors.grey),
                       filled: true,
                       fillColor: bgColor,
-                      prefixIcon: const Icon(
-                        Icons.attach_money,
-                        color: Colors.grey,
-                        size: 20,
-                      ),
+                      prefixIcon: const Icon(Icons.attach_money,
+                          color: Colors.grey, size: 20),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide: BorderSide.none,
@@ -595,10 +420,8 @@ class _ContractorRFPDetailsScreenState
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Cover Letter',
-                    style: TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
+                  const Text('Cover Letter',
+                      style: TextStyle(color: Colors.white70, fontSize: 13)),
                   const SizedBox(height: 8),
                   TextField(
                     controller: descController,
@@ -619,11 +442,8 @@ class _ContractorRFPDetailsScreenState
                     const SizedBox(height: 20),
                     Row(
                       children: [
-                        const Icon(
-                          Icons.checklist_rounded,
-                          color: primaryBlue,
-                          size: 18,
-                        ),
+                        const Icon(Icons.checklist_rounded,
+                            color: primaryBlue, size: 18),
                         const SizedBox(width: 8),
                         const Text(
                           'Evaluation Criteria',
@@ -636,16 +456,12 @@ class _ContractorRFPDetailsScreenState
                       ],
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'Upload one or more files for each criterion',
-                      style: TextStyle(color: Colors.grey, fontSize: 12),
-                    ),
+                    const Text('Upload one or more files for each criterion',
+                        style: TextStyle(color: Colors.grey, fontSize: 12)),
                     const SizedBox(height: 12),
                     ...criteria.map((criterionName) {
                       final files = criteriaFiles[criterionName] ?? [];
-                      // FIX 9: null-safe check لـ uploadingForCriterion
-                      final isLoadingThis =
-                          isUploadingFile &&
+                      final isLoadingThis = isUploadingFile &&
                           uploadingForCriterion == criterionName;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 16),
@@ -654,9 +470,7 @@ class _ContractorRFPDetailsScreenState
                           children: [
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
+                                  horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
                                 color: primaryBlue.withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(20),
@@ -681,20 +495,15 @@ class _ContractorRFPDetailsScreenState
                                   color: bgColor,
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: Colors.green.withOpacity(0.3),
-                                  ),
+                                      color: Colors.green.withOpacity(0.3)),
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(
-                                      Icons.check_circle,
-                                      color: Colors.green,
-                                      size: 16,
-                                    ),
+                                    const Icon(Icons.check_circle,
+                                        color: Colors.green, size: 16),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: GestureDetector(
-                                        // FIX 7: استخدام _openPickedFile بدل _openFile لأنها الأنسب هنا
                                         onTap: () => _openPickedFile(file),
                                         child: Text(
                                           file['name'] as String,
@@ -710,15 +519,11 @@ class _ContractorRFPDetailsScreenState
                                       ),
                                     ),
                                     GestureDetector(
-                                      onTap: () => setSheetState(
-                                        () => criteriaFiles[criterionName]!
-                                            .removeAt(idx),
-                                      ),
-                                      child: const Icon(
-                                        Icons.close,
-                                        color: Colors.grey,
-                                        size: 16,
-                                      ),
+                                      onTap: () => setSheetState(() =>
+                                          criteriaFiles[criterionName]!
+                                              .removeAt(idx)),
+                                      child: const Icon(Icons.close,
+                                          color: Colors.grey, size: 16),
                                     ),
                                   ],
                                 ),
@@ -731,8 +536,7 @@ class _ContractorRFPDetailsScreenState
                               child: Container(
                                 width: double.infinity,
                                 padding: const EdgeInsets.symmetric(
-                                  vertical: 12,
-                                ),
+                                    vertical: 12),
                                 decoration: BoxDecoration(
                                   border: Border.all(
                                     color: files.isEmpty
@@ -747,9 +551,8 @@ class _ContractorRFPDetailsScreenState
                                           width: 18,
                                           height: 18,
                                           child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.grey,
-                                          ),
+                                              strokeWidth: 2,
+                                              color: Colors.grey),
                                         ),
                                       )
                                     : Row(
@@ -789,9 +592,7 @@ class _ContractorRFPDetailsScreenState
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
+                        horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: bgColor,
                       borderRadius: BorderRadius.circular(12),
@@ -799,19 +600,14 @@ class _ContractorRFPDetailsScreenState
                     ),
                     child: Row(
                       children: [
-                        const Icon(
-                          Icons.bar_chart_rounded,
-                          color: primaryBlue,
-                          size: 18,
-                        ),
+                        const Icon(Icons.bar_chart_rounded,
+                            color: primaryBlue, size: 18),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             '$totalUploaded file(s) uploaded  •  AI will read & score each',
                             style: const TextStyle(
-                              color: Colors.grey,
-                              fontSize: 12.5,
-                            ),
+                                color: Colors.grey, fontSize: 12.5),
                           ),
                         ),
                       ],
@@ -825,8 +621,7 @@ class _ContractorRFPDetailsScreenState
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryBlue,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                       onPressed: isSubmitting
                           ? null
@@ -835,40 +630,42 @@ class _ContractorRFPDetailsScreenState
                                   descController.text.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('Please fill all fields'),
-                                  ),
+                                      content: Text('Please fill all fields')),
                                 );
                                 return;
                               }
                               final missing = criteria
-                                  .where(
-                                    (c) => (criteriaFiles[c] ?? []).isEmpty,
-                                  )
+                                  .where((c) =>
+                                      (criteriaFiles[c] ?? []).isEmpty)
                                   .toList();
                               if (missing.isNotEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      'Please upload files for: ${missing.join(', ')}',
-                                    ),
+                                        'Please upload files for: ${missing.join(', ')}'),
                                   ),
                                 );
                                 return;
                               }
                               setSheetState(() => isSubmitting = true);
                               try {
-                                final userId = supabase.auth.currentUser!.id;
-                                final result = await _computeAiScoreWithDetails(
+                                final userId =
+                                    supabase.auth.currentUser!.id;
+                                final result =
+                                    await _computeAiScoreWithDetails(
                                   criteriaFiles: criteriaFiles,
-                                  rfpDescription: _rfp?['description'] ?? '',
+                                  rfpDescription:
+                                      _rfp?['description'] ?? '',
                                   evaluationCriteria:
                                       _rfp?['evaluationCriteria'] ?? '',
                                 );
-                                final finalScore = result['finalScore'] as int;
+                                final finalScore =
+                                    result['finalScore'] as int;
                                 final criteriaScores =
                                     result['criteriaScores']
                                         as Map<String, int>;
-                                final criteriaResponse = criteriaScores.entries
+                                final criteriaResponse = criteriaScores
+                                    .entries
                                     .map((e) => '${e.key}: ${e.value}')
                                     .join(' | ');
 
@@ -879,29 +676,35 @@ class _ContractorRFPDetailsScreenState
                                       'submitterUserId': userId,
                                       'proposedPrice':
                                           double.tryParse(
-                                            priceController.text,
-                                          ) ??
-                                          0,
-                                      'description': descController.text.trim(),
+                                                  priceController.text) ??
+                                              0,
+                                      'description':
+                                          descController.text.trim(),
                                       'status': 'Submitted',
                                       'score': finalScore,
                                       'submitDate': DateTime.now()
                                           .toIso8601String()
                                           .split('T')[0],
-                                      'comments': criteriaResponse.isEmpty
-                                          ? null
-                                          : criteriaResponse,
+                                      'comments':
+                                          criteriaResponse.isEmpty
+                                              ? null
+                                              : criteriaResponse,
                                     })
                                     .select('ProposalID')
                                     .maybeSingle();
 
                                 if (proposalResult == null)
-                                  throw Exception('Failed to insert proposal');
-                                final proposalId = proposalResult['ProposalID'];
+                                  throw Exception(
+                                      'Failed to insert proposal');
+                                final proposalId =
+                                    proposalResult['ProposalID'];
 
-                                for (final entry in criteriaFiles.entries) {
+                                for (final entry
+                                    in criteriaFiles.entries) {
                                   for (final file in entry.value) {
-                                    await supabase.from('Document').insert({
+                                    await supabase
+                                        .from('Document')
+                                        .insert({
                                       'fullName': file['name'],
                                       'fileURL': file['url'],
                                       'uploadDate': DateTime.now()
@@ -920,8 +723,8 @@ class _ContractorRFPDetailsScreenState
                                     .eq('id', userId)
                                     .maybeSingle();
                                 await _notifyManager(
-                                  userData?['username'] ?? 'A contractor',
-                                );
+                                    userData?['username'] ??
+                                        'A contractor');
 
                                 if (mounted) {
                                   Navigator.pop(ctx);
@@ -932,19 +735,21 @@ class _ContractorRFPDetailsScreenState
                                       builder: (_) => FinalTotalScoreScreen(
                                         contractorName:
                                             userData?['username'] ??
-                                            'Contractor',
+                                                'Contractor',
                                         score: finalScore,
-                                        proposalId: proposalId.toString(),
+                                        proposalId:
+                                            proposalId.toString(),
                                       ),
                                     ),
                                   );
                                 }
                               } catch (e) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Error: $e')),
-                                );
+                                    SnackBar(
+                                        content: Text('Error: $e')));
                               } finally {
-                                setSheetState(() => isSubmitting = false);
+                                setSheetState(
+                                    () => isSubmitting = false);
                               }
                             },
                       child: isSubmitting
@@ -955,23 +760,19 @@ class _ContractorRFPDetailsScreenState
                                   width: 20,
                                   height: 20,
                                   child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
+                                      color: Colors.white, strokeWidth: 2),
                                 ),
                                 SizedBox(width: 12),
-                                Text(
-                                  'AI is reading files...',
-                                  style: TextStyle(color: Colors.white),
-                                ),
+                                Text('AI is reading files...',
+                                    style:
+                                        TextStyle(color: Colors.white)),
                               ],
                             )
                           : const Text(
                               'Submit Proposal',
                               style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold),
                             ),
                     ),
                   ),
@@ -982,7 +783,7 @@ class _ContractorRFPDetailsScreenState
         },
       ),
     );
-  } // FIX 6: إغلاق _showSubmitProposalSheet بشكل صحيح
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -995,271 +796,242 @@ class _ContractorRFPDetailsScreenState
           icon: const Icon(Icons.arrow_back, color: Colors.white),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'RFP Details',
-          style: TextStyle(color: Colors.white, fontSize: 18),
-        ),
+        title: const Text('RFP Details',
+            style: TextStyle(color: Colors.white, fontSize: 18)),
         centerTitle: true,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: primaryBlue))
-          : _rfp == null
           ? const Center(
-              child: Text(
-                'RFP not found',
-                style: TextStyle(color: Colors.grey),
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: cardColor,
-                      borderRadius: BorderRadius.circular(15),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _rfp!['title'] ?? 'Untitled',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
+              child: CircularProgressIndicator(color: primaryBlue))
+          : _rfp == null
+              ? const Center(
+                  child: Text('RFP not found',
+                      style: TextStyle(color: Colors.grey)))
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: cardColor,
+                          borderRadius: BorderRadius.circular(15),
                         ),
-                        const SizedBox(height: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Text(
-                            'Open for Proposals',
-                            style: TextStyle(
-                              color: Colors.green,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _rfp!['title'] ?? 'Untitled',
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold),
                             ),
+                            const SizedBox(height: 10),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Text(
+                                'Open for Proposals',
+                                style: TextStyle(
+                                    color: Colors.green,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      _buildSectionTitle('Key Information'),
+                      _buildInfoCard([
+                        _buildInfoRow(Icons.attach_money, 'Budget',
+                            _rfp!['budget'] != null
+                                ? '\$${_rfp!['budget']}'
+                                : '—'),
+                        _buildInfoRow(Icons.calendar_today, 'Deadline',
+                            _rfp!['deadline'] ?? '—'),
+                        _buildInfoRow(Icons.date_range, 'Posted',
+                            _rfp!['creationDate'] ?? '—'),
+                        if (_rfp!['requiredTag'] != null)
+                          _buildInfoRow(Icons.label_outline, 'Category',
+                              _rfp!['requiredTag']),
+                      ]),
+                      const SizedBox(height: 20),
+                      _buildSectionTitle('Description'),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: cardColor,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          _rfp!['description'] ??
+                              'No description provided.',
+                          style: const TextStyle(
+                              color: Colors.white70,
+                              height: 1.6,
+                              fontSize: 14),
+                        ),
+                      ),
+                      if (_criteriaNames.isNotEmpty) ...[
+                        const SizedBox(height: 20),
+                        _buildSectionTitle('Evaluation Criteria'),
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: cardColor,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _criteriaNames
+                                .map((name) => Container(
+                                      padding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color:
+                                            primaryBlue.withOpacity(0.15),
+                                        borderRadius:
+                                            BorderRadius.circular(20),
+                                        border: Border.all(
+                                            color: primaryBlue
+                                                .withOpacity(0.3)),
+                                      ),
+                                      child: Text(name,
+                                          style: const TextStyle(
+                                              color: primaryBlue,
+                                              fontSize: 13,
+                                              fontWeight:
+                                                  FontWeight.w600)),
+                                    ))
+                                .toList(),
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildSectionTitle('Key Information'),
-                  _buildInfoCard([
-                    _buildInfoRow(
-                      Icons.attach_money,
-                      'Budget',
-                      _rfp!['budget'] != null ? '\$${_rfp!['budget']}' : '—',
-                    ),
-                    _buildInfoRow(
-                      Icons.calendar_today,
-                      'Deadline',
-                      _rfp!['deadline'] ?? '—',
-                    ),
-                    _buildInfoRow(
-                      Icons.date_range,
-                      'Posted',
-                      _rfp!['creationDate'] ?? '—',
-                    ),
-                    if (_rfp!['requiredTag'] != null)
-                      _buildInfoRow(
-                        Icons.label_outline,
-                        'Category',
-                        _rfp!['requiredTag'],
-                      ),
-                  ]),
-                  const SizedBox(height: 20),
-                  _buildSectionTitle('Description'),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: cardColor,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _rfp!['description'] ?? 'No description provided.',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        height: 1.6,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                  if (_criteriaNames.isNotEmpty) ...[
-                    const SizedBox(height: 20),
-                    _buildSectionTitle('Evaluation Criteria'),
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: cardColor,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _criteriaNames
-                            .map(
-                              (name) => Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: primaryBlue.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: primaryBlue.withOpacity(0.3),
-                                  ),
-                                ),
-                                child: Text(
-                                  name,
-                                  style: const TextStyle(
-                                    color: primaryBlue,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 40),
-                  if (_hasSubmitted) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.green.withOpacity(0.3),
-                        ),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.check_circle, color: Colors.green),
-                          SizedBox(width: 8),
-                          Text(
-                            'Proposal Already Submitted',
-                            style: TextStyle(
-                              color: Colors.green,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (_submittedProposal != null)
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: primaryBlue),
-                            foregroundColor: primaryBlue,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          icon: const Icon(Icons.visibility_outlined),
-                          label: const Text(
-                            'Review My Proposal',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ContractorProposalDetailsScreen(
-                                proposal: _submittedProposal!,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                  ] else
-                    SizedBox(
-                      width: double.infinity,
-                      height: 55,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryBlue,
-                          shape: RoundedRectangleBorder(
+                      const SizedBox(height: 40),
+                      if (_hasSubmitted) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                                color: Colors.green.withOpacity(0.3)),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.check_circle,
+                                  color: Colors.green),
+                              SizedBox(width: 8),
+                              Text('Proposal Already Submitted',
+                                  style: TextStyle(
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.w600)),
+                            ],
                           ),
                         ),
-                        onPressed: _showSubmitProposalSheet,
-                        child: const Text(
-                          'Submit Proposal',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                        const SizedBox(height: 12),
+                        if (_submittedProposal != null)
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(
+                                    color: primaryBlue),
+                                foregroundColor: primaryBlue,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(12)),
+                              ),
+                              icon: const Icon(
+                                  Icons.visibility_outlined),
+                              label: const Text('Review My Proposal',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold)),
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      ContractorProposalDetailsScreen(
+                                          proposal: _submittedProposal!),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ] else
+                        SizedBox(
+                          width: double.infinity,
+                          height: 55,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryBlue,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(12)),
+                            ),
+                            onPressed: _showSubmitProposalSheet,
+                            child: const Text('Submit Proposal',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold)),
                           ),
                         ),
-                      ),
-                    ),
-                  const SizedBox(height: 20),
-                ],
-              ),
-            ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
     );
   }
 
   Widget _buildSectionTitle(String title) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: Text(
-      title,
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-  );
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Text(title,
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold)),
+      );
 
   Widget _buildInfoCard(List<Widget> rows) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: cardColor,
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Column(children: rows),
-  );
-
-  Widget _buildInfoRow(IconData icon, String label, String value) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Row(
-      children: [
-        Icon(icon, color: Colors.grey, size: 16),
-        const SizedBox(width: 10),
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 14)),
-        const Spacer(),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-          ),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: cardColor,
+          borderRadius: BorderRadius.circular(12),
         ),
-      ],
-    ),
-  );
+        child: Column(children: rows),
+      );
+
+  Widget _buildInfoRow(IconData icon, String label, String value) =>
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.grey, size: 16),
+            const SizedBox(width: 10),
+            Text(label,
+                style:
+                    const TextStyle(color: Colors.grey, fontSize: 14)),
+            const Spacer(),
+            Text(value,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500)),
+          ],
+        ),
+      );
 }

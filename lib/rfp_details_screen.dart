@@ -1,3 +1,4 @@
+// rfp_details_screen.dart
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'create_rfp_screen.dart';
@@ -37,11 +38,12 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
           .single();
 
       // جلب المرفقات
-      final docs = await supabase
-          .from('Document')
-          .select()
-          .eq('uploadType', 'RFP_Attachment')
-          .order('uploadDate', ascending: false);
+     final docs = await supabase
+    .from('Document')
+    .select()
+    .eq('uploadType', 'RFP_Attachment')
+    .eq('rfpID', widget.rfpId)
+    .order('uploadDate', ascending: false);
 
       if (mounted) {
         setState(() {
