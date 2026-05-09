@@ -7,6 +7,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import 'finalize_contract_screen.dart';
+import 'proposals_list_screen.dart';
+import 'dashboard.dart';
 
 class AINegotiationScreen extends StatefulWidget {
   final String sessionId;
@@ -56,7 +58,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
   String _aiSuggestionText = '';
   String _sessionStatus = 'Active';
 
-  // ✅ جديد: تفاصيل المشروع تُجلب مباشرة من قاعدة البيانات
   String _rfpDescription = '';
   String _rfpScope = '';
   String _rfpBudget = '';
@@ -135,7 +136,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           .eq('sessionID', sessionId)
           .order('roundID', ascending: true);
 
-      // ✅ جلب تفاصيل المشروع من جدول RFP مباشرة
       try {
         final rfp = await supabase
             .from('RFP')
@@ -301,8 +301,8 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
           'history': history,
           'criteria': widget.selectedCriteria.join(', '),
           'isManager': widget.isManager,
-          'description': _rfpDescription, // ✅ من قاعدة البيانات مباشرة
-          'scope': _rfpScope,             // ✅ من قاعدة البيانات مباشرة
+          'description': _rfpDescription,
+          'scope': _rfpScope,
         },
       );
       if (mounted) {
@@ -716,10 +716,19 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        // ← السهم يرجع لصفحة البروبوزال
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
+  icon: const Icon(Icons.arrow_back, color: Colors.white),
+  onPressed: () {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProposalsListScreen(rfpId: widget.rfpId),
+      ),
+      (route) => route.isFirst,
+    );
+  },
+),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -727,6 +736,20 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             Text('${widget.contractorName} • $_sessionStatus', style: TextStyle(color: isCompleted ? Colors.greenAccent : Colors.orangeAccent, fontSize: 11)),
           ],
         ),
+        // ← أيقونة الهوم ترجع للداش بورد
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.home_rounded, color: Colors.white70, size: 24),
+            tooltip: 'Dashboard',
+            onPressed: () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const BidPlus()),
+                (route) => false,
+              );
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [
