@@ -50,28 +50,26 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
   bool _isUploadingFile = false;
 
   final List<String> standardCriteria = [
-    "Cost",
-    "Experience",
-    "Technical",
-    "Timeline",
+    'Cost',
+    'Experience',
+    'Technical',
+    'Timeline',
   ];
-
   List<Map<String, String>> criteriaList = [];
   List<TextEditingController> weightControllers = [];
-
   bool _ahpApplied = false;
-  //ignore: unused_field
+  // ignore: unused_field
   double? _lastCR;
 
   final List<Map<String, String>> _tags = [
-    {"label": "Construction", "value": "construction"},
-    {"label": "Engineering", "value": "engineering"},
-    {"label": "IT & Software", "value": "it"},
-    {"label": "Design", "value": "design"},
-    {"label": "Maintenance", "value": "maintenance"},
-    {"label": "Consulting", "value": "consulting"},
-    {"label": "Logistics", "value": "logistics"},
-    {"label": "Other", "value": "other"},
+    {'label': 'Construction', 'value': 'construction'},
+    {'label': 'Engineering', 'value': 'engineering'},
+    {'label': 'IT & Software', 'value': 'it'},
+    {'label': 'Design', 'value': 'design'},
+    {'label': 'Maintenance', 'value': 'maintenance'},
+    {'label': 'Consulting', 'value': 'consulting'},
+    {'label': 'Logistics', 'value': 'logistics'},
+    {'label': 'Other', 'value': 'other'},
   ];
 
   bool get _isEditMode => widget.rfpId != null;
@@ -91,8 +89,7 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
 
     if (widget.initialEvaluationCriteria != null &&
         widget.initialEvaluationCriteria!.isNotEmpty) {
-      final parts = widget.initialEvaluationCriteria!.split(',');
-      for (final part in parts) {
+      for (final part in widget.initialEvaluationCriteria!.split(',')) {
         final trimmed = part.trim();
         final colonIdx = trimmed.indexOf(':');
         if (colonIdx == -1) continue;
@@ -125,13 +122,10 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
     descriptionController.dispose();
     deadlineController.dispose();
     _requiredSpecController.dispose();
-    for (var c in weightControllers) {
-      c.dispose();
-    }
+    for (var c in weightControllers) c.dispose();
     super.dispose();
   }
 
-  // ── فتح الملف ──
   Future<void> _openFile(String url) async {
     if (url.isEmpty) return;
     try {
@@ -140,11 +134,10 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
       try {
         await launchUrl(Uri.parse(url), mode: LaunchMode.platformDefault);
       } catch (_) {
-        if (mounted){
+        if (mounted)
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(const SnackBar(content: Text('Could not open file')));
-          }
       }
     }
   }
@@ -156,17 +149,13 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
       );
       return;
     }
-
     final names = criteriaList.map((c) => c['name']!).toList();
-
     final result = await showDialog<Map<String, double>>(
       context: context,
       barrierDismissible: false,
       builder: (_) => AHPDialog(criteria: names),
     );
-
     if (result == null) return;
-
     final percents = AHPCalculator.weightsToPercent(result.values.toList());
     setState(() {
       for (int i = 0; i < criteriaList.length; i++) {
@@ -178,8 +167,7 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
       }
       _ahpApplied = true;
     });
-
-// ignore: use_build_context_synchronously
+    // ignore: use_build_context_synchronously
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text('✓ Weights applied successfully'),
@@ -229,19 +217,18 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
           _uploadedUrls.add(publicUrl);
         });
       }
-      if (mounted){
+      if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Files uploaded!'),
             backgroundColor: Colors.green,
           ),
-        );}
+        );
     } catch (e) {
-      if (mounted){
+      if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
-        }
     } finally {
       if (mounted) setState(() => _isUploadingFile = false);
     }
@@ -295,6 +282,15 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
           .map((e) => '${e.value['name']}:${weightControllers[e.key].text}%')
           .join(', ');
 
+      // ── حفظ الـ URLs كـ JSON في عمود attachments ──
+      final attachmentsJson = _uploadedUrls.isNotEmpty
+          ? _uploadedUrls
+                .asMap()
+                .entries
+                .map((e) => '${_pickedFiles[e.key].name}||${e.value}')
+                .join(';;')
+          : null;
+
       final payload = {
         'title': titleController.text.trim(),
         'description': descriptionController.text.trim(),
@@ -307,6 +303,7 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
             ? null
             : _requiredSpecController.text.trim(),
         'requiredTag': _selectedRequiredTag,
+        'attachments': attachmentsJson, // ← الجديد
       };
 
       if (_isEditMode) {
@@ -321,28 +318,12 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
           Navigator.pop(context);
         }
       } else {
-        final newRfp = await supabase
-            .from('RFP')
-            .insert({
-              ...payload,
-              'status': 'Draft',
-              'creatorUser': userId,
-              'creationDate': DateTime.now().toIso8601String().split('T')[0],
-            })
-            .select('rfpID')
-            .maybeSingle();
-
-        if (newRfp == null) throw Exception('Failed to create RFP');
-
-        for (int i = 0; i < _pickedFiles.length; i++) {
-          await supabase.from('Document').insert({
-            'fullName': _pickedFiles[i].name,
-            'fileURL': _uploadedUrls[i],
-            'uploadDate': DateTime.now().toIso8601String().split('T')[0],
-            'uploader': userId,
-            'uploadType': 'RFP_Attachment',
-          });
-        }
+        await supabase.from('RFP').insert({
+          ...payload,
+          'status': 'Draft',
+          'creatorUser': userId,
+          'creationDate': DateTime.now().toIso8601String().split('T')[0],
+        });
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -355,16 +336,15 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
         }
       }
     } on PostgrestException catch (e) {
-      if (mounted){
+      if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: ${e.message}')));
-        }
     } catch (e) {
-      if (mounted){
+      if (mounted)
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));}
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -480,13 +460,13 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: _ahpApplied
-                          ? greenColor.withValues(alpha: 0.15)
-                          : primaryBlue.withValues(alpha: 0.15),
+                          ? greenColor.withOpacity(0.15)
+                          : primaryBlue.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: _ahpApplied
-                            ? greenColor.withValues(alpha: 0.5)
-                            : primaryBlue.withValues(alpha: 0.5),
+                            ? greenColor.withOpacity(0.5)
+                            : primaryBlue.withOpacity(0.5),
                       ),
                     ),
                     child: Row(
@@ -521,7 +501,7 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
                 child: Text(
                   'Weights set by AHP — you can still adjust them manually',
                   style: TextStyle(
-                    color: greenColor.withValues(alpha: 0.7),
+                    color: greenColor.withOpacity(0.7),
                     fontSize: 11,
                   ),
                 ),
@@ -714,7 +694,6 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
     ),
   );
 
-  // ── tile فيه زر فتح + زر حذف ──
   Widget _buildUploadedFileTile(
     String name,
     String size, {
@@ -748,7 +727,6 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
             ],
           ),
         ),
-        // زر فتح الملف
         if (onOpen != null)
           GestureDetector(
             onTap: onOpen,
@@ -761,7 +739,6 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
               ),
             ),
           ),
-        // زر حذف الملف
         GestureDetector(
           onTap: onRemove,
           child: const Icon(Icons.close, color: Colors.grey, size: 18),

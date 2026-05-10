@@ -1,4 +1,3 @@
-// rfp_details_screen.dart
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'create_rfp_screen.dart';
@@ -19,9 +18,11 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
   static const Color primaryBlue = Color(0xFF3395FF);
 
   Map<String, dynamic>? _rfp;
-  List<Map<String, dynamic>> _attachments = [];
   bool _isLoading = true;
   bool _isDeleting = false;
+
+  // ── الملفات المحللة من عمود attachments ──
+  List<Map<String, String>> _attachments = [];
 
   @override
   void initState() {
@@ -37,18 +38,22 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
           .eq('rfpID', widget.rfpId)
           .single();
 
-      // جلب المرفقات
-     final docs = await supabase
-    .from('Document')
-    .select()
-    .eq('uploadType', 'RFP_Attachment')
-    .eq('rfpID', widget.rfpId)
-    .order('uploadDate', ascending: false);
+      // ── حلّل عمود attachments ──
+      final List<Map<String, String>> parsed = [];
+      final rawAttachments = data['attachments'] as String?;
+      if (rawAttachments != null && rawAttachments.isNotEmpty) {
+        for (final item in rawAttachments.split(';;')) {
+          final parts = item.split('||');
+          if (parts.length == 2) {
+            parsed.add({'name': parts[0], 'url': parts[1]});
+          }
+        }
+      }
 
       if (mounted) {
         setState(() {
           _rfp = data;
-          _attachments = List<Map<String, dynamic>>.from(docs);
+          _attachments = parsed;
           _isLoading = false;
         });
       }
@@ -64,11 +69,10 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
 
   Future<void> _openFile(String? url) async {
     if (url == null || url.isEmpty) {
-      if (mounted){
+      if (mounted)
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('No file URL available')));
-      }
       return;
     }
     try {
@@ -77,11 +81,10 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
       try {
         await launchUrl(Uri.parse(url), mode: LaunchMode.platformDefault);
       } catch (_) {
-        if (mounted){
+        if (mounted)
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(const SnackBar(content: Text('Could not open file')));
-          }
       }
     }
   }
@@ -123,7 +126,7 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha:0.1),
+                  color: Colors.red.withOpacity(0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.close, color: Colors.red, size: 30),
@@ -271,7 +274,7 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
                     _buildContentBox(_rfp!['evaluationCriteria']),
                   ],
 
-                  // ── Attachments ──
+                  // ── Attachments من عمود attachments في RFP ──
                   const SizedBox(height: 25),
                   _buildSectionTitle("Attachments"),
                   _attachments.isEmpty
@@ -301,49 +304,50 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
                           ),
                         )
                       : Column(
-                          children: _attachments.map((doc) {
-                            final url = doc['fileURL'] as String?;
-                            final name = doc['fullName'] ?? 'File';
-                            return GestureDetector(
-                              onTap: () => _openFile(url),
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF161D27),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.white12),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.description_outlined,
-                                      color: primaryBlue,
-                                      size: 20,
+                          children: _attachments
+                              .map(
+                                (doc) => GestureDetector(
+                                  onTap: () => _openFile(doc['url']),
+                                  child: Container(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF161D27),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: Colors.white12),
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        name,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 13,
-                                          decoration: TextDecoration.underline,
-                                          decorationColor: Colors.white38,
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.description_outlined,
+                                          color: primaryBlue,
+                                          size: 20,
                                         ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Text(
+                                            doc['name'] ?? 'File',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 13,
+                                              decoration:
+                                                  TextDecoration.underline,
+                                              decorationColor: Colors.white38,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const Icon(
+                                          Icons.open_in_new_rounded,
+                                          color: primaryBlue,
+                                          size: 16,
+                                        ),
+                                      ],
                                     ),
-                                    const Icon(
-                                      Icons.open_in_new_rounded,
-                                      color: primaryBlue,
-                                      size: 16,
-                                    ),
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            );
-                          }).toList(),
+                              )
+                              .toList(),
                         ),
 
                   const SizedBox(height: 40),
@@ -357,15 +361,14 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
 
   Widget _buildActionButtons() {
     final status = _rfp!['status'];
-
     if (status == 'Published') {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.green.withValues(alpha:0.1),
+          color: Colors.green.withOpacity(0.1),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.green.withValues(alpha:0.3)),
+          border: Border.all(color: Colors.green.withOpacity(0.3)),
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -465,7 +468,7 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withValues(alpha:0.2),
+        color: color.withOpacity(0.2),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
@@ -536,7 +539,7 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
   }) => Container(
     height: 55,
     decoration: BoxDecoration(
-      color: btnColor ?? color.withValues(alpha:0.1),
+      color: btnColor ?? color.withOpacity(0.1),
       borderRadius: BorderRadius.circular(12),
     ),
     child: InkWell(
