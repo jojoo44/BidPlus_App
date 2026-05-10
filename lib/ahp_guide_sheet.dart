@@ -128,7 +128,7 @@ class _AHPGuideSheetState extends State<AHPGuideSheet> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: blueColor.withOpacity(0.15),
+                      color: blueColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
@@ -207,10 +207,10 @@ class _AHPGuideSheetState extends State<AHPGuideSheet> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: active ? blueColor.withOpacity(0.15) : Colors.transparent,
+          color: active ? blueColor.withValues(alpha: 0.15) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: active ? blueColor.withOpacity(0.5) : Colors.white12,
+            color: active ? blueColor.withValues(alpha: 0.5) : Colors.white12,
           ),
         ),
         child: Text(
@@ -378,7 +378,7 @@ class _AHPGuideSheetState extends State<AHPGuideSheet> {
               width: 22,
               height: 22,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
+                color: color.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: icon != null
@@ -408,7 +408,7 @@ class _AHPGuideSheetState extends State<AHPGuideSheet> {
           ],
         ),
       );
-
+// ignore: unused_element // Kept for potential future use Widget
   Widget _buildExampleCard({
     required String title,
     required Color titleColor,
@@ -459,6 +459,7 @@ class _AHPGuideSheetState extends State<AHPGuideSheet> {
     ),
   );
 
+// ignore: unused_element 
   Widget _exampleRow(
     String subject,
     String verb,
@@ -471,7 +472,7 @@ class _AHPGuideSheetState extends State<AHPGuideSheet> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
-            color: subjectColor.withOpacity(0.15),
+            color: subjectColor.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(
@@ -546,8 +547,8 @@ class _AHPGuideSheetState extends State<AHPGuideSheet> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: ok
-                  ? greenColor.withOpacity(0.3)
-                  : redColor.withOpacity(0.3),
+                  ? greenColor.withValues(alpha: 0.3)
+                  : redColor.withValues(alpha: 0.3),
             ),
           ),
           child: Column(
@@ -690,8 +691,8 @@ class _AHPGuideSheetState extends State<AHPGuideSheet> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: ok
-                  ? greenColor.withOpacity(0.3)
-                  : redColor.withOpacity(0.3),
+                  ? greenColor.withValues(alpha: 0.3)
+                  : redColor.withValues(alpha: 0.3),
             ),
           ),
           child: Column(
@@ -751,8 +752,8 @@ class _AHPGuideSheetState extends State<AHPGuideSheet> {
               color: value == 4
                   ? Colors.white12
                   : (value < 4
-                        ? blueColor.withOpacity(0.2)
-                        : greenColor.withOpacity(0.2)),
+                        ? blueColor.withValues(alpha: 0.2)
+                        : greenColor.withValues(alpha: 0.2)),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
@@ -791,12 +792,12 @@ class _AHPGuideSheetState extends State<AHPGuideSheet> {
         children: [
           Text(
             '← $leftLabel',
-            style: TextStyle(color: blueColor.withOpacity(0.7), fontSize: 10),
+            style: TextStyle(color: blueColor.withValues(alpha: 0.7), fontSize: 10),
           ),
           Text('equal', style: TextStyle(color: Colors.white38, fontSize: 10)),
           Text(
             '$rightLabel →',
-            style: TextStyle(color: greenColor.withOpacity(0.7), fontSize: 10),
+            style: TextStyle(color: greenColor.withValues(alpha: 0.7), fontSize: 10),
           ),
         ],
       ),

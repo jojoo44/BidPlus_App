@@ -255,9 +255,9 @@ class _EvaluateTabScreenState extends State<EvaluateTabScreen> {
     child: Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(
         children: [
@@ -286,12 +286,12 @@ class _EvaluateTabScreenState extends State<EvaluateTabScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
-          color: isActive ? accentAmber.withOpacity(0.15) : surface,
+          color: isActive ? accentAmber.withValues(alpha: 0.15) : surface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isActive
-                ? accentAmber.withOpacity(0.5)
-                : Colors.white.withOpacity(0.08),
+                ? accentAmber.withValues(alpha: 0.5)
+                : Colors.white.withValues(alpha: 0.08),
           ),
         ),
         child: Text(
@@ -320,8 +320,8 @@ class _EvaluateTabScreenState extends State<EvaluateTabScreen> {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: reviewed
-              ? accentGreen.withOpacity(0.2)
-              : Colors.white.withOpacity(0.07),
+              ? accentGreen.withValues(alpha: 0.2)
+              : Colors.white.withValues(alpha: 0.07),
         ),
       ),
       child: Column(
@@ -331,8 +331,7 @@ class _EvaluateTabScreenState extends State<EvaluateTabScreen> {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: (reviewed ? accentGreen : accentAmber).withOpacity(
-                    0.1,
+                  color: (reviewed ? accentGreen : accentAmber).withValues(alpha: 0.1,
                   ),
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -377,8 +376,8 @@ class _EvaluateTabScreenState extends State<EvaluateTabScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: reviewed
-                      ? accentGreen.withOpacity(0.12)
-                      : accentAmber.withOpacity(0.12),
+                      ? accentGreen.withValues(alpha: 0.12)
+                      : accentAmber.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -401,7 +400,7 @@ class _EvaluateTabScreenState extends State<EvaluateTabScreen> {
               style: OutlinedButton.styleFrom(
                 foregroundColor: reviewed ? accentGreen : Colors.amber,
                 side: BorderSide(
-                  color: reviewed ? accentGreen.withOpacity(0.4) : Colors.amber,
+                  color: reviewed ? accentGreen.withValues(alpha:0.4) : Colors.amber,
                   width: 1,
                 ),
                 shape: RoundedRectangleBorder(

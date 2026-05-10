@@ -90,6 +90,7 @@ class _ReviewPublishScreenState extends State<ReviewPublishScreen> {
 
       if (mounted) _showSuccessDialog();
     } catch (e) {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')));
     } finally {
@@ -184,8 +185,8 @@ class _ReviewPublishScreenState extends State<ReviewPublishScreen> {
   Widget _buildErrorBanner() => Container(
     padding: const EdgeInsets.all(15),
     decoration: BoxDecoration(
-      color: Colors.red.withOpacity(0.1),
-      border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
+      color: Colors.red.withValues(alpha:0.1),
+      border: Border.all(color: Colors.redAccent.withValues(alpha:0.5)),
       borderRadius: BorderRadius.circular(12),
     ),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -207,8 +208,8 @@ class _ReviewPublishScreenState extends State<ReviewPublishScreen> {
   Widget _buildReadyBanner() => Container(
     padding: const EdgeInsets.all(15),
     decoration: BoxDecoration(
-      color: Colors.green.withOpacity(0.1),
-      border: Border.all(color: Colors.green.withOpacity(0.4)),
+      color: Colors.green.withValues(alpha:0.1),
+      border: Border.all(color: Colors.green.withValues(alpha:0.4)),
       borderRadius: BorderRadius.circular(12),
     ),
     child: const Row(children: [
@@ -259,7 +260,7 @@ class _ReviewPublishScreenState extends State<ReviewPublishScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1), shape: BoxShape.circle),
+                color: Colors.green.withValues(alpha:0.1), shape: BoxShape.circle),
             child: const Icon(Icons.check_circle, color: Colors.green, size: 48),
           ),
           const SizedBox(height: 16),

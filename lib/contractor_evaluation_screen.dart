@@ -158,14 +158,14 @@ class _ContractorEvaluationScreenState
                     decoration: BoxDecoration(
                       color: surface,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: accentBlue.withOpacity(0.15)),
+                      border: Border.all(color: accentBlue.withValues(alpha: 0.15)),
                     ),
                     child: Row(
                       children: [
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: accentBlue.withOpacity(0.1),
+                            color: accentBlue.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Icon(
@@ -220,10 +220,10 @@ class _ContractorEvaluationScreenState
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.1),
+                        color: Colors.green.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Colors.green.withOpacity(0.3),
+                          color: Colors.green.withValues(alpha: 0.3),
                         ),
                       ),
                       child: const Row(
@@ -276,7 +276,7 @@ class _ContractorEvaluationScreenState
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(
-                            color: accentBlue.withOpacity(0.4),
+                            color: accentBlue.withValues(alpha: 0.4),
                           ),
                         ),
                       ),

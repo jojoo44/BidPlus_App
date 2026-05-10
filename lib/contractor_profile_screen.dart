@@ -106,7 +106,7 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
         }
       }
 
-      if (mounted)
+      if (mounted){
         setState(() {
           _username = data['username'] ?? '';
           _email = data['email'] ?? '';
@@ -120,6 +120,7 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
           _bioCtrl.text = _bio;
           _isLoading = false;
         });
+        }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -136,11 +137,11 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
         _editingBio = false;
       });
     } catch (e) {
-      if (mounted)
+      if (mounted){
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
-    }
+    }}
   }
 
   Future<void> _openFile(String url) async {
@@ -168,6 +169,8 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                 child: Image.network(
                   url,
                   fit: BoxFit.contain,
+                
+                  // ignore: unnecessary_underscores
                   errorBuilder: (_, __, ___) => const Icon(
                     Icons.broken_image,
                     color: Colors.grey,
@@ -286,11 +289,11 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
         _loadAll();
       }
     } catch (e) {
-      if (mounted)
+      if (mounted){
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: $e')));
-    } finally {
+    } } finally {
       if (mounted) setState(() => _isUploading = false);
     }
   }
@@ -307,12 +310,12 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
 
   Future<void> _logout() async {
     await supabase.auth.signOut();
-    if (mounted)
+    if (mounted){
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
         (route) => false,
-      );
+      );}
   }
 
   @override
@@ -424,7 +427,7 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: blue.withOpacity(0.15),
+                                color: blue.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
@@ -463,10 +466,10 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                               if (_isOwner)
                                 GestureDetector(
                                   onTap: () {
-                                    if (_editingBio)
-                                      _saveBio();
-                                    else
-                                      setState(() => _editingBio = true);
+                                    if (_editingBio){
+                                      _saveBio();}
+                                    else{
+                                      setState(() => _editingBio = true);}
                                   },
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
@@ -474,7 +477,7 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                                       vertical: 6,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: blue.withOpacity(0.15),
+                                      color: blue.withValues(alpha: 0.15),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Text(
@@ -507,7 +510,7 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                                       hintText:
                                           'Tell managers about yourself...',
                                       hintStyle: TextStyle(
-                                        color: Colors.white.withOpacity(0.3),
+                                        color: Colors.white.withValues(alpha: 0.3),
                                         fontSize: 13,
                                       ),
                                       border: InputBorder.none,
@@ -519,7 +522,7 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                                         ? 'Tap Edit to add a bio...'
                                         : 'No bio yet.',
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.3),
+                                      color: Colors.white.withValues(alpha: 0.3),
                                       fontSize: 13,
                                       fontStyle: FontStyle.italic,
                                     ),
@@ -549,7 +552,7 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                                 color: surface,
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
-                                  color: Colors.white.withOpacity(0.06),
+                                  color: Colors.white.withValues(alpha: 0.06),
                                 ),
                               ),
                               child: Row(
@@ -578,7 +581,7 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                                         vertical: 3,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: blue.withOpacity(0.15),
+                                        color: blue.withValues(alpha: 0.15),
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Text(
@@ -666,7 +669,7 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                                       vertical: 6,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: blue.withOpacity(0.15),
+                                      color: blue.withValues(alpha: 0.15),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: _isUploading
@@ -826,7 +829,7 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
       decoration: BoxDecoration(
         color: surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -868,7 +871,7 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: _scoreColor(overall).withOpacity(0.15),
+                  color: _scoreColor(overall).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -1010,6 +1013,7 @@ class _ContractorProfileScreenState extends State<ContractorProfileScreen> {
                           width: 64,
                           height: 52,
                           fit: BoxFit.cover,
+                          // ignore: unnecessary_underscores
                           errorBuilder: (_, __, ___) => const Icon(
                             Icons.broken_image,
                             color: Colors.grey,

@@ -5,6 +5,7 @@ import 'profile_screen.dart';
 import 'create_rfp_screen.dart';
 import 'rfp_details_screen.dart';
 import 'rfp_selector_screen.dart';
+// ignore: unused_import
 import 'active_rfp_details_screen.dart';
 import 'notifications_screen.dart';
 import 'negotiation_mng_screen.dart';
@@ -300,7 +301,7 @@ class _BidPlusState extends State<BidPlus> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.15),
+                      color: Colors.green.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -584,7 +585,7 @@ class _BidPlusState extends State<BidPlus> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: progressColor.withOpacity(0.15),
+                color: progressColor.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(

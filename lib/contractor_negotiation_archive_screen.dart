@@ -207,7 +207,7 @@ class _ContractorNegotiationArchiveScreenState
                               'Once the manager invites you,\nsessions will appear here.',
                               textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.4),
+                                color: Colors.white.withValues(alpha: 0.4),
                                 fontSize: 13,
                               ),
                             ),
@@ -239,7 +239,7 @@ class _ContractorNegotiationArchiveScreenState
       decoration: BoxDecoration(
         color: surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -285,7 +285,7 @@ class _ContractorNegotiationArchiveScreenState
           color: surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: statusColor.withOpacity(isActive ? 0.25 : 0.1),
+            color: statusColor.withValues(alpha: isActive ? 0.25 : 0.1),
           ),
         ),
         child: Row(
@@ -293,9 +293,8 @@ class _ContractorNegotiationArchiveScreenState
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: (isActive ? Colors.orange : Colors.green).withOpacity(
-                  0.1,
-                ),
+                color: (isActive ? Colors.orange : Colors.green).withValues(alpha: 0.1),
+
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
@@ -340,10 +339,10 @@ class _ContractorNegotiationArchiveScreenState
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: accentBlue.withOpacity(0.1),
+                                color: accentBlue.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: accentBlue.withOpacity(0.3),
+                                  color: accentBlue.withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Text(
@@ -370,7 +369,7 @@ class _ContractorNegotiationArchiveScreenState
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.15),
+                    color: statusColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(

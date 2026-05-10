@@ -1,3 +1,5 @@
+// ignore_for_file: file_names
+
 import 'package:flutter/material.dart';
 import 'qualified_contractors_screen.dart';
 import '../main.dart';
@@ -290,7 +292,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
+                color: Colors.green.withValues(alpha:0.1),
                 borderRadius: BorderRadius.circular(5),
               ),
               child: Text(
@@ -351,7 +353,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: _statusColor(status).withOpacity(0.1),
+                color: _statusColor(status).withValues(alpha:0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(

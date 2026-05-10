@@ -144,7 +144,7 @@ class _CriteriaSelectionScreenState extends State<CriteriaSelectionScreen> {
               Text(
                 'Based on RFP evaluation criteria',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.35),
+                  color: Colors.white.withValues(alpha: 0.35),
                   fontSize: 12,
                 ),
               ),
@@ -163,7 +163,7 @@ class _CriteriaSelectionScreenState extends State<CriteriaSelectionScreen> {
                   ? Center(
                       child: Text(
                         'No criteria found',
-                        style: TextStyle(color: Colors.white.withOpacity(0.5)),
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5)),
                       ),
                     )
                   : ListView(

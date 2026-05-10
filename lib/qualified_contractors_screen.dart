@@ -207,9 +207,9 @@ class _QualifiedContractorsScreenState
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: primaryBlue.withOpacity(0.15),
+                    color: primaryBlue.withValues(alpha:0.15),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: primaryBlue.withOpacity(0.4)),
+                    border: Border.all(color: primaryBlue.withValues(alpha:0.4)),
                   ),
                   child: Text(
                     '$_qualifiedCount / $_totalCount qualified',
@@ -272,10 +272,10 @@ class _QualifiedContractorsScreenState
                           vertical: 12,
                         ),
                         decoration: BoxDecoration(
-                          color: primaryBlue.withOpacity(0.08),
+                          color: primaryBlue.withValues(alpha:0.08),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: primaryBlue.withOpacity(0.2),
+                            color: primaryBlue.withValues(alpha:0.2),
                           ),
                         ),
                         child: Column(
@@ -305,7 +305,7 @@ class _QualifiedContractorsScreenState
                               '  ·  $_qualifiedCount qualified'
                               '  ·  ${_totalCount - _qualifiedCount} below threshold',
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.5),
+                                color: Colors.white.withValues(alpha:0.5),
                                 fontSize: 11,
                               ),
                             ),
@@ -346,7 +346,7 @@ class _QualifiedContractorsScreenState
                             children: [
                               Icon(
                                 Icons.people_outline,
-                                color: Colors.grey.withOpacity(0.5),
+                                color: Colors.grey.withValues(alpha:0.5),
                                 size: 52,
                               ),
                               const SizedBox(height: 12),
@@ -381,10 +381,10 @@ class _QualifiedContractorsScreenState
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           decoration: BoxDecoration(
-            color: selected ? primaryBlue.withOpacity(0.2) : Colors.transparent,
+            color: selected ? primaryBlue.withValues(alpha:0.2) : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: selected ? primaryBlue.withOpacity(0.6) : Colors.white12,
+              color: selected ? primaryBlue.withValues(alpha:0.6) : Colors.white12,
             ),
           ),
           child: Text(
@@ -426,12 +426,12 @@ class _QualifiedContractorsScreenState
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: isQualified ? cardColor : cardColor.withOpacity(0.6),
+        color: isQualified ? cardColor : cardColor.withValues(alpha:0.6),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isQualified
-              ? (rank <= 3 ? medalColor.withOpacity(0.4) : Colors.white12)
-              : Colors.red.withOpacity(0.3),
+              ? (rank <= 3 ? medalColor.withValues(alpha:0.4) : Colors.white12)
+              : Colors.red.withValues(alpha:0.3),
         ),
       ),
       child: Column(
@@ -443,8 +443,8 @@ class _QualifiedContractorsScreenState
                 top: Radius.circular(14),
               ),
               color: isQualified
-                  ? medalColor.withOpacity(0.7)
-                  : Colors.red.withOpacity(0.5),
+                  ? medalColor.withValues(alpha:0.7)
+                  : Colors.red.withValues(alpha:0.5),
             ),
           ),
 
@@ -456,7 +456,7 @@ class _QualifiedContractorsScreenState
                 Row(
                   children: [
                     CircleAvatar(
-                      backgroundColor: medalColor.withOpacity(0.15),
+                      backgroundColor: medalColor.withValues(alpha:0.15),
                       radius: 20,
                       child: Text(
                         medalLabel,
@@ -498,7 +498,7 @@ class _QualifiedContractorsScreenState
                                 decoration: BoxDecoration(
                                   color:
                                       (isQualified ? Colors.green : Colors.red)
-                                          .withOpacity(0.12),
+                                          .withValues(alpha:0.12),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
@@ -548,11 +548,11 @@ class _QualifiedContractorsScreenState
                       borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
                         value: result.ciScore.clamp(0.0, 1.0),
-                        backgroundColor: Colors.white.withOpacity(0.07),
+                        backgroundColor: Colors.white.withValues(alpha:0.07),
                         valueColor: AlwaysStoppedAnimation<Color>(
                           isQualified
-                              ? medalColor.withOpacity(0.8)
-                              : Colors.red.withOpacity(0.6),
+                              ? medalColor.withValues(alpha:0.8)
+                              : Colors.red.withValues(alpha:0.6),
                         ),
                         minHeight: 8,
                       ),
@@ -563,7 +563,7 @@ class _QualifiedContractorsScreenState
                       bottom: 0,
                       child: Container(
                         width: 2,
-                        color: Colors.white.withOpacity(0.4),
+                        color: Colors.white.withValues(alpha:0.4),
                       ),
                     ),
                   ],
@@ -577,7 +577,7 @@ class _QualifiedContractorsScreenState
                     Text(
                       'RFP Threshold: ${(threshold * 100).toStringAsFixed(0)}%',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.35),
+                        color: Colors.white.withValues(alpha:0.35),
                         fontSize: 10,
                       ),
                     ),
@@ -585,8 +585,8 @@ class _QualifiedContractorsScreenState
                       isQualified ? 'Passed ✓' : 'Did not meet minimum',
                       style: TextStyle(
                         color: isQualified
-                            ? Colors.green.withOpacity(0.7)
-                            : Colors.red.withOpacity(0.7),
+                            ? Colors.green.withValues(alpha:0.7)
+                            : Colors.red.withValues(alpha:0.7),
                         fontSize: 10,
                       ),
                     ),
@@ -611,9 +611,9 @@ class _QualifiedContractorsScreenState
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: color.withOpacity(0.1),
+                          color: color.withValues(alpha:0.1),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: color.withOpacity(0.3)),
+                          border: Border.all(color: color.withValues(alpha:0.3)),
                         ),
                         child: Text(
                           '${_capitalize(e.key)}: ${score.toInt()}',
@@ -632,9 +632,9 @@ class _QualifiedContractorsScreenState
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: primaryBlue.withOpacity(0.06),
+                    color: primaryBlue.withValues(alpha:0.06),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: primaryBlue.withOpacity(0.12)),
+                    border: Border.all(color: primaryBlue.withValues(alpha:0.12)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -652,7 +652,7 @@ class _QualifiedContractorsScreenState
                             widget.weights ?? {},
                           ),
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.6),
+                            color: Colors.white.withValues(alpha:0.6),
                             fontSize: 11,
                             height: 1.4,
                           ),

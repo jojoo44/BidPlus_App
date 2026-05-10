@@ -224,7 +224,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.15),
+                  color: Colors.green.withValues(alpha:0.15),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -458,7 +458,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         border: Border.all(
                           color: isSelected
                               ? const Color(0xFF5D78FF)
-                              : Colors.grey.withOpacity(0.2),
+                              : Colors.grey.withValues(alpha:0.2),
                         ),
                       ),
                       child: Text(
@@ -713,7 +713,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     decoration: BoxDecoration(
       color: const Color(0xFF161B22),
       borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: Colors.grey.withOpacity(0.1)),
+      border: Border.all(color: Colors.grey.withValues(alpha:0.1)),
     ),
     child: Row(
       mainAxisAlignment: MainAxisAlignment.center,

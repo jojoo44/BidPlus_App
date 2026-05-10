@@ -35,11 +35,12 @@ class _ContractorProposalDetailsScreenState
           .select()
           .eq('proposalID', proposalId)
           .eq('uploadType', 'Proposal_Attachment');
-      if (mounted)
+      if (mounted){
         setState(() {
           _attachments = List<Map<String, dynamic>>.from(data);
           _loadingDocs = false;
         });
+        }
     } catch (_) {
       if (mounted) setState(() => _loadingDocs = false);
     }
@@ -47,10 +48,11 @@ class _ContractorProposalDetailsScreenState
 
   Future<void> _openFile(String? url) async {
     if (url == null || url.isEmpty) {
-      if (mounted)
+      if (mounted){
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('No file URL available')));
+        }
       return;
     }
     try {
@@ -59,10 +61,11 @@ class _ContractorProposalDetailsScreenState
       try {
         await launchUrl(Uri.parse(url), mode: LaunchMode.platformDefault);
       } catch (_) {
-        if (mounted)
+        if (mounted){
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(const SnackBar(content: Text('Could not open file')));
+          }
       }
     }
   }
@@ -143,10 +146,10 @@ class _ContractorProposalDetailsScreenState
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: _statusColor(status).withOpacity(0.1),
+                color: _statusColor(status).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: _statusColor(status).withOpacity(0.3),
+                  color: _statusColor(status).withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -259,10 +262,10 @@ class _ContractorProposalDetailsScreenState
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: primary.withOpacity(0.12),
+                                  color: primary.withValues(alpha: 0.12),
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
-                                    color: primary.withOpacity(0.3),
+                                    color: primary.withValues(alpha: 0.3),
                                   ),
                                 ),
                                 child: Text(

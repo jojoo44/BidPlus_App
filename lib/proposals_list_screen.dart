@@ -248,9 +248,9 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                backgroundColor: const Color(0xFF3395FF).withOpacity(0.12),
+                backgroundColor: const Color(0xFF3395FF).withValues(alpha:0.12),
                 side: BorderSide(
-                  color: const Color(0xFF3395FF).withOpacity(0.3),
+                  color: const Color(0xFF3395FF).withValues(alpha:0.3),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 4),
               ),
@@ -321,9 +321,9 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.08),
+                  color: Colors.orange.withValues(alpha:0.08),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  border: Border.all(color: Colors.orange.withValues(alpha:0.3)),
                 ),
                 child: Row(
                   children: [
@@ -337,7 +337,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                       child: Text(
                         'No proposals with AI scores yet.',
                         style: TextStyle(
-                          color: Colors.orange.withOpacity(0.9),
+                          color: Colors.orange.withValues(alpha:0.9),
                           fontSize: 12,
                         ),
                       ),
@@ -500,8 +500,8 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
     Color? borderColor;
     if (hasTopsis) {
       borderColor = isQualified == true
-          ? Colors.green.withOpacity(0.3)
-          : Colors.red.withOpacity(0.3);
+          ? Colors.green.withValues(alpha:0.3)
+          : Colors.red.withValues(alpha:0.3);
     }
 
     return Container(
@@ -524,8 +524,8 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                 ),
                 gradient: LinearGradient(
                   colors: [
-                    _rankColor(rank).withOpacity(0.8),
-                    _rankColor(rank).withOpacity(0.2),
+                    _rankColor(rank).withValues(alpha:0.8),
+                    _rankColor(rank).withValues(alpha:0.2),
                   ],
                 ),
               ),
@@ -556,10 +556,10 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: _rankColor(rank).withOpacity(0.12),
+                          color: _rankColor(rank).withValues(alpha:0.12),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: _rankColor(rank).withOpacity(0.4),
+                            color: _rankColor(rank).withValues(alpha:0.4),
                           ),
                         ),
                         child: Text(
@@ -618,7 +618,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                         decoration: BoxDecoration(
                           color:
                               (isQualified == true ? Colors.green : Colors.red)
-                                  .withOpacity(0.12),
+                                  .withValues(alpha:0.12),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -650,11 +650,11 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
                       value: topsisScore.clamp(0.0, 1.0),
-                      backgroundColor: Colors.white.withOpacity(0.08),
+                      backgroundColor: Colors.white.withValues(alpha:0.08),
                       valueColor: AlwaysStoppedAnimation<Color>(
                         isQualified == true
-                            ? _rankColor(rank).withOpacity(0.8)
-                            : Colors.red.withOpacity(0.6),
+                            ? _rankColor(rank).withValues(alpha:0.8)
+                            : Colors.red.withValues(alpha:0.6),
                       ),
                       minHeight: 6,
                     ),
@@ -666,7 +666,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                       Text(
                         'RFP Threshold: ${(rfpThreshold * 100).toStringAsFixed(0)}%',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.3),
+                          color: Colors.white.withValues(alpha:0.3),
                           fontSize: 10,
                         ),
                       ),
@@ -674,7 +674,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                         Text(
                           'Below minimum',
                           style: TextStyle(
-                            color: Colors.red.withOpacity(0.7),
+                            color: Colors.red.withValues(alpha:0.7),
                             fontSize: 10,
                           ),
                         ),
@@ -687,10 +687,10 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF3395FF).withOpacity(0.07),
+                      color: const Color(0xFF3395FF).withValues(alpha:0.07),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: const Color(0xFF3395FF).withOpacity(0.15),
+                        color: const Color(0xFF3395FF).withValues(alpha:0.15),
                       ),
                     ),
                     child: Row(
@@ -706,7 +706,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                           child: Text(
                             aiInsight,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
+                              color: Colors.white.withValues(alpha:0.7),
                               fontSize: 11,
                               height: 1.4,
                             ),
@@ -764,7 +764,7 @@ class _ProposalsListScreenState extends State<ProposalsListScreen> {
                     vertical: 5,
                   ),
                   decoration: BoxDecoration(
-                    color: _statusColor(status).withOpacity(0.1),
+                    color: _statusColor(status).withValues(alpha:0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(

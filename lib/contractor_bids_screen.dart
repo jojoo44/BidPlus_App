@@ -201,9 +201,9 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.15),
+                  color: accentColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: accentColor.withOpacity(0.4)),
+                  border: Border.all(color: accentColor.withValues(alpha: 0.4)),
                 ),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   Icon(_statusIcon(pStatus), color: accentColor, size: 14),
@@ -219,7 +219,7 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20),
+                  color: accentColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(rfp['requiredTag'], style: TextStyle(color: accentColor, fontSize: 12)),
               ),
@@ -253,8 +253,8 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.08), borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: accentColor.withOpacity(0.3)),
+                  color: accentColor.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: accentColor.withValues(alpha: 0.3)),
                 ),
                 child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                   Icon(_statusIcon(pStatus), color: accentColor, size: 18),
@@ -344,7 +344,7 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
                           cursorColor: _accent,
                           decoration: InputDecoration(
                             hintText: 'Search bids...',
-                            hintStyle: TextStyle(color: _muted.withOpacity(0.7)),
+                            hintStyle: TextStyle(color: _muted.withValues(alpha: 0.7)),
                             border: InputBorder.none,
                           ),
                         )),
@@ -354,9 +354,9 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                               decoration: BoxDecoration(
-                                color: _accent.withOpacity(0.15),
+                                color: _accent.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(999),
-                                border: Border.all(color: _accent.withOpacity(0.4)),
+                                border: Border.all(color: _accent.withValues(alpha: 0.4)),
                               ),
                               child: Text('Clear', style: TextStyle(
                                 color: _accent, fontSize: 12, fontWeight: FontWeight.w700)),
@@ -387,9 +387,9 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                               decoration: BoxDecoration(
-                                color: selected ? _accent.withOpacity(0.18) : _card,
+                                color: selected ? _accent.withValues(alpha: 0.18) : _card,
                                 borderRadius: BorderRadius.circular(999),
-                                border: Border.all(color: selected ? _accent.withOpacity(0.7) : _line),
+                                border: Border.all(color: selected ? _accent.withValues(alpha: 0.7) : _line),
                               ),
                               child: Text(t['label']!, style: TextStyle(
                                 color: selected ? _accent : _muted,
@@ -414,6 +414,7 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
                       ))
                     else
                       ...list.map((rfp) {
+                        // ignore: unused_local_variable
                         final rfpId = rfp['rfpID'].toString();
                         final overdue = _isOverdue(rfp['deadline']);
 
@@ -428,16 +429,16 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
                             child: InkWell(
                               onTap: () => _onTapRFP(rfp),
                               borderRadius: BorderRadius.circular(18),
-                              splashColor: _accent.withOpacity(0.08),
+                              splashColor: _accent.withValues(alpha: 0.08),
                               child: Padding(
                                 padding: const EdgeInsets.all(14),
                                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                   Container(
                                     width: 42, height: 42,
                                     decoration: BoxDecoration(
-                                      color: _accent.withOpacity(0.1),
+                                      color: _accent.withValues(alpha: 0.1),
                                       borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(color: _accent.withOpacity(0.25)),
+                                      border: Border.all(color: _accent.withValues(alpha: 0.25)),
                                     ),
                                     child: Icon(Icons.work_outline, color: _accent, size: 20),
                                   ),
@@ -481,7 +482,7 @@ class _ContractorBidsScreenState extends State<ContractorBidsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: c.withOpacity(0.07), borderRadius: BorderRadius.circular(999)),
+        color: c.withValues(alpha: 0.07), borderRadius: BorderRadius.circular(999)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(icon, size: 13, color: c),
         const SizedBox(width: 4),
@@ -540,7 +541,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
       child: SingleChildScrollView(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Center(child: Container(width: 40, height: 4,
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.18),
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18),
                 borderRadius: BorderRadius.circular(999)))),
           const SizedBox(height: 16),
           Row(children: [
@@ -549,7 +550,7 @@ class _FiltersSheetState extends State<_FiltersSheet> {
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(color: widget.accent.withOpacity(0.2), borderRadius: BorderRadius.circular(999)),
+                decoration: BoxDecoration(color: widget.accent.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(999)),
                 child: Text('$_activeCount active', style: TextStyle(color: widget.accent, fontSize: 11, fontWeight: FontWeight.w700)),
               ),
             ],
@@ -571,9 +572,9 @@ class _FiltersSheetState extends State<_FiltersSheet> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: selected ? widget.accent.withOpacity(0.16) : Colors.white.withOpacity(0.04),
+                    color: selected ? widget.accent.withValues(alpha: 0.16) : Colors.white.withValues(alpha: 0.04),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: selected ? widget.accent.withOpacity(0.7) : Colors.white.withOpacity(0.08)),
+                    border: Border.all(color: selected ? widget.accent.withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.08)),
                   ),
                   child: Text(t['label']!, style: TextStyle(
                     color: selected ? widget.accent : Colors.white70,
@@ -609,9 +610,9 @@ class _FiltersSheetState extends State<_FiltersSheet> {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
-                border: Border.all(color: _before != null ? widget.accent.withOpacity(0.5) : widget.line),
+                border: Border.all(color: _before != null ? widget.accent.withValues(alpha: 0.5) : widget.line),
                 borderRadius: BorderRadius.circular(14),
-                color: _before != null ? widget.accent.withOpacity(0.05) : Colors.white.withOpacity(0.03),
+                color: _before != null ? widget.accent.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.03),
               ),
               child: Row(children: [
                 Icon(Icons.event_rounded, color: _before != null ? widget.accent : widget.muted, size: 18),
@@ -671,8 +672,8 @@ class _FiltersSheetState extends State<_FiltersSheet> {
     onChanged: (_) => setState(() {}),
     decoration: InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(color: widget.muted.withOpacity(0.6), fontSize: 13),
-      filled: true, fillColor: Colors.white.withOpacity(0.03),
+      hintStyle: TextStyle(color: widget.muted.withValues(alpha: 0.6), fontSize: 13),
+      filled: true, fillColor: Colors.white.withValues(alpha: 0.03),
       enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: widget.line), borderRadius: BorderRadius.circular(14)),
       focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: widget.accent), borderRadius: BorderRadius.circular(14)),
     ),

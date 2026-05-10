@@ -15,6 +15,7 @@ class ContractorNegotiationScreen extends StatefulWidget {
 class _ContractorNegotiationScreenState
     extends State<ContractorNegotiationScreen> {
   static const Color bg = Color(0xFF0A1628);
+  // ignore: unused_field
   static const Color cardColor = Color(0xFF0F1F3A);
   static const Color accent = Color(0xFF41C0FF);
 
@@ -299,7 +300,7 @@ class _ContractorNegotiationScreenState
                             'Once the manager invites you,\nnegotiation will appear here.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.4),
+                              color: Colors.white.withValues(alpha: 0.4),
                               fontSize: 13,
                             ),
                           ),
@@ -309,7 +310,7 @@ class _ContractorNegotiationScreenState
                   : ListView.separated(
                       itemCount: _sessions.length,
                       separatorBuilder: (_, _) => Divider(
-                        color: Colors.white.withOpacity(0.05),
+                        color: Colors.white.withValues(alpha: 0.05),
                         height: 1,
                       ),
                       itemBuilder: (_, i) {
@@ -324,8 +325,8 @@ class _ContractorNegotiationScreenState
                           ),
                           leading: CircleAvatar(
                             backgroundColor: isActive
-                                ? accent.withOpacity(0.2)
-                                : Colors.grey.withOpacity(0.2),
+                                ? accent.withValues(alpha: 0.2)
+                                : Colors.grey.withValues(alpha: 0.2),
                             radius: 26,
                             child: Icon(
                               Icons.handshake_outlined,
@@ -349,7 +350,7 @@ class _ContractorNegotiationScreenState
                               Text(
                                 _fmtTime(s['lastTime']),
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.4),
+                                  color: Colors.white.withValues(alpha: 0.4),
                                   fontSize: 11,
                                 ),
                               ),
@@ -362,7 +363,7 @@ class _ContractorNegotiationScreenState
                               Text(
                                 s['lastMessage'] ?? '',
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.5),
+                                  color: Colors.white.withValues(alpha: 0.5),
                                   fontSize: 13,
                                 ),
                                 maxLines: 1,
@@ -374,7 +375,7 @@ class _ContractorNegotiationScreenState
                                   Text(
                                     'Manager: ${s['managerName']}',
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.3),
+                                      color: Colors.white.withValues(alpha: 0.3),
                                       fontSize: 11,
                                     ),
                                   ),
@@ -386,8 +387,8 @@ class _ContractorNegotiationScreenState
                                     ),
                                     decoration: BoxDecoration(
                                       color: isActive
-                                          ? Colors.orange.withOpacity(0.15)
-                                          : Colors.green.withOpacity(0.15),
+                                          ? Colors.orange.withValues(alpha: 0.15)
+                                          : Colors.green.withValues(alpha: 0.15),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Text(

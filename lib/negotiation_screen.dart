@@ -236,8 +236,9 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             final widgetSid = widget.sessionId;
             if ((rowSession != widgetSid &&
                     rowSession != int.tryParse(widgetSid)?.toString()) ||
-                !mounted)
+                !mounted){
               return;
+              }
             final type = row['uploadType']?.toString() ?? '';
             if (type == 'Contract') {
               setState(() {
@@ -320,7 +321,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
       if (mounted) setState(() => _isGeneratingSuggestion = false);
     }
   }
-
+//ignore: unused_element
   Future<void> _completeNegotiation() async {
     setState(() => _isGeneratingSuggestion = true);
     try {
@@ -802,7 +803,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                           decoration: BoxDecoration(
                             color: cardColor,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: primaryBlue.withOpacity(0.3)),
+                            border: Border.all(color: primaryBlue.withValues(alpha: 0.3)),
                           ),
                           child: Row(
                             children: [
@@ -870,7 +871,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator(color: primaryBlue))
                 : _rounds.isEmpty
-                    ? Center(child: Text(widget.isManager ? 'Start the negotiation' : 'Waiting for the manager to start...', style: TextStyle(color: Colors.white.withOpacity(0.4))))
+                    ? Center(child: Text(widget.isManager ? 'Start the negotiation' : 'Waiting for the manager to start...', style: TextStyle(color: Colors.white.withValues(alpha: 0.4))))
                     : ListView.builder(
                         controller: _scrollCtrl,
                         padding: const EdgeInsets.all(16),
@@ -959,7 +960,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.greenAccent.withOpacity(0.15),
+                    backgroundColor: Colors.greenAccent.withValues(alpha: 0.15),
                     foregroundColor: Colors.greenAccent,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10), side: const BorderSide(color: Colors.greenAccent, width: 0.5)),
                   ),
@@ -980,7 +981,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         child: Container(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: Colors.amber.withOpacity(0.08), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.amber.withOpacity(0.3))),
+          decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.amber.withValues(alpha: 0.3))),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -996,7 +997,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                   onTap: _isUploadingContract ? null : _deleteContract,
                   child: Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.15), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.redAccent.withOpacity(0.4))),
+                    decoration: BoxDecoration(color: Colors.redAccent.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.redAccent.withValues(alpha: 0.4))),
                     child: _isUploadingContract
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2))
                         : const Icon(Icons.delete_outline, color: Colors.redAccent, size: 20),
@@ -1019,7 +1020,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         child: Container(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.blue.withOpacity(0.3))),
+          decoration: BoxDecoration(color: Colors.blue.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.blue.withValues(alpha: 0.3))),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1033,7 +1034,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
                 onTap: _downloadContract,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(color: Colors.lightBlueAccent.withOpacity(0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.lightBlueAccent.withOpacity(0.25))),
+                  decoration: BoxDecoration(color: Colors.lightBlueAccent.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.lightBlueAccent.withValues(alpha: 0.25))),
                   child: Row(children: [
                     const Icon(Icons.insert_drive_file, color: Colors.lightBlueAccent, size: 22),
                     const SizedBox(width: 10),
@@ -1069,7 +1070,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
         child: Container(
           padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: Colors.green.withOpacity(0.08), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.green.withOpacity(0.3))),
+          decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.green.withValues(alpha: 0.3))),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1112,7 +1113,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
 
   Widget _fileBox(String name, Color color, {bool showDownload = false}) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-    decoration: BoxDecoration(color: color.withOpacity(0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: color.withOpacity(0.25))),
+    decoration: BoxDecoration(color: color.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(8), border: Border.all(color: color.withValues(alpha: 0.25))),
     child: Row(children: [
       Icon(Icons.insert_drive_file, color: color, size: 20),
       const SizedBox(width: 10),
@@ -1124,9 +1125,9 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
   Widget _statusChip(String label, bool done) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
     decoration: BoxDecoration(
-      color: done ? Colors.green.withOpacity(0.2) : Colors.white.withOpacity(0.05),
+      color: done ? Colors.green.withValues(alpha:0.2) : Colors.white.withValues(alpha:0.05),
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: done ? Colors.greenAccent.withOpacity(0.5) : Colors.white24),
+      border: Border.all(color: done ? Colors.greenAccent.withValues(alpha:0.5) : Colors.white24),
     ),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
       Icon(done ? Icons.check : Icons.hourglass_empty, size: 12, color: done ? Colors.greenAccent : Colors.white38),
@@ -1140,7 +1141,7 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
   Widget _buildBanner(IconData icon, Color color, String text) => Container(
     margin: const EdgeInsets.all(12),
     padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withOpacity(0.3))),
+    decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12), border: Border.all(color: color.withValues(alpha: 0.3))),
     child: Row(children: [
       Icon(icon, color: color, size: 18),
       const SizedBox(width: 10),
@@ -1197,6 +1198,7 @@ class _ChatBubble extends StatelessWidget {
                             if (progress == null) return child;
                             return Container(width: screenWidth * 0.65, height: 140, color: Colors.white10, child: const Center(child: CircularProgressIndicator(color: Colors.white54, strokeWidth: 2)));
                           },
+                          // ignore: unnecessary_underscores
                           errorBuilder: (_, __, ___) => _fileTile(screenWidth),
                         ),
                       )
@@ -1226,7 +1228,7 @@ class _ChatBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: iconColor.withOpacity(0.15), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: iconColor, size: 22)),
+        Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: iconColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)), child: Icon(icon, color: iconColor, size: 22)),
         const SizedBox(width: 10),
         Flexible(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(fileName, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis, maxLines: 2),

@@ -1,5 +1,6 @@
 // contractor_rfp_details_screen.dart
 import 'dart:async';
+// ignore: unused_import
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -162,11 +163,11 @@ class _ContractorRFPDetailsScreenState
           .select()
           .eq('rfpID', widget.rfpId)
           .maybeSingle();
-      if (mounted)
+      if (mounted){
         setState(() {
           _rfp = data;
           _isLoading = false;
-        });
+        });}
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -182,13 +183,13 @@ class _ContractorRFPDetailsScreenState
           .eq('RFP', widget.rfpId)
           .eq('submitterUserId', userId);
       final list = data as List;
-      if (mounted)
+      if (mounted){
         setState(() {
           _hasSubmitted = list.isNotEmpty;
           if (list.isNotEmpty) {
             _submittedProposal = Map<String, dynamic>.from(list.first);
           }
-        });
+        });}
     } catch (_) {}
   }
 
@@ -211,8 +212,8 @@ class _ContractorRFPDetailsScreenState
           .select('notificationsEnabled')
           .eq('id', managerId)
           .maybeSingle();
-      if (managerData == null || managerData['notificationsEnabled'] == false)
-        return;
+      if (managerData == null || managerData['notificationsEnabled'] == false){
+        return;}
       await supabase.from('Notification').insert({
         'userID': managerId,
         'type': 'New Proposal Received',
@@ -223,7 +224,7 @@ class _ContractorRFPDetailsScreenState
       });
     } catch (_) {}
   }
-
+// ignore: unused_element
   Future<void> _openFile(String url) async {
     if (url.isEmpty) return;
     try {
@@ -232,9 +233,10 @@ class _ContractorRFPDetailsScreenState
       try {
         await launchUrl(Uri.parse(url), mode: LaunchMode.platformDefault);
       } catch (_) {
-        if (mounted)
+        if (mounted){
           ScaffoldMessenger.of(context)
               .showSnackBar(const SnackBar(content: Text('Cannot open file')));
+        }
       }
     }
   }
@@ -472,7 +474,7 @@ class _ContractorRFPDetailsScreenState
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: primaryBlue.withOpacity(0.15),
+                                color: primaryBlue.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
@@ -495,7 +497,7 @@ class _ContractorRFPDetailsScreenState
                                   color: bgColor,
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                      color: Colors.green.withOpacity(0.3)),
+                                      color: Colors.green.withValues(alpha: 0.3)),
                                 ),
                                 child: Row(
                                   children: [
@@ -541,7 +543,7 @@ class _ContractorRFPDetailsScreenState
                                   border: Border.all(
                                     color: files.isEmpty
                                         ? Colors.white12
-                                        : primaryBlue.withOpacity(0.3),
+                                        : primaryBlue.withValues(alpha: 0.3),
                                   ),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -693,9 +695,10 @@ class _ContractorRFPDetailsScreenState
                                     .select('ProposalID')
                                     .maybeSingle();
 
-                                if (proposalResult == null)
+                                if (proposalResult == null){
                                   throw Exception(
                                       'Failed to insert proposal');
+                                      }
                                 final proposalId =
                                     proposalResult['ProposalID'];
 
@@ -727,7 +730,7 @@ class _ContractorRFPDetailsScreenState
                                         'A contractor');
 
                                 if (mounted) {
-                                  Navigator.pop(ctx);
+                                  Navigator.pop(context);
                                   setState(() => _hasSubmitted = true);
                                   await Navigator.push(
                                     context,
@@ -744,6 +747,7 @@ class _ContractorRFPDetailsScreenState
                                   );
                                 }
                               } catch (e) {
+                                // ignore: use_build_context_synchronously
                                 ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                         content: Text('Error: $e')));
@@ -834,7 +838,7 @@ class _ContractorRFPDetailsScreenState
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: Colors.green.withOpacity(0.15),
+                                color: Colors.green.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: const Text(
@@ -900,12 +904,12 @@ class _ContractorRFPDetailsScreenState
                                               horizontal: 12, vertical: 6),
                                       decoration: BoxDecoration(
                                         color:
-                                            primaryBlue.withOpacity(0.15),
+                                            primaryBlue.withValues(alpha: 0.15),
                                         borderRadius:
                                             BorderRadius.circular(20),
                                         border: Border.all(
                                             color: primaryBlue
-                                                .withOpacity(0.3)),
+                                                .withValues(alpha: 0.3)),
                                       ),
                                       child: Text(name,
                                           style: const TextStyle(
@@ -924,10 +928,10 @@ class _ContractorRFPDetailsScreenState
                           width: double.infinity,
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.1),
+                            color: Colors.green.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                                color: Colors.green.withOpacity(0.3)),
+                                color: Colors.green.withValues(alpha: 0.3)),
                           ),
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,

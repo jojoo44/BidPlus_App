@@ -73,10 +73,9 @@ class _ContractorNotificationsScreenState
     final type = (n['type'] ?? '').toString().toLowerCase();
     final relatedId = n['relatedID']?.toString();
 
-    print('🔔 Notification tap: type=$type, relatedId=$relatedId');
+    debugPrint('🔔 Notification tap: type=$type, relatedId=$relatedId');
 
     if (!mounted) return;
-
     if (type.contains('rfp')) {
       if (relatedId != null) {
         Navigator.push(
@@ -107,7 +106,7 @@ class _ContractorNotificationsScreenState
             );
           }
         } catch (e) {
-          print('proposal fetch error: $e');
+          debugPrint('proposal fetch error: $e');
         }
       }
     } else if (type.contains('negotiation')) {
@@ -219,7 +218,7 @@ class _ContractorNotificationsScreenState
                         color: const Color(0xFF1A2C47),
                         borderRadius: BorderRadius.circular(12),
                         border: isUnread
-                            ? Border.all(color: color.withOpacity(0.3))
+                            ? Border.all(color: color.withValues(alpha: 0.3))
                             : null,
                       ),
                       child: Row(
@@ -227,7 +226,7 @@ class _ContractorNotificationsScreenState
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: color.withOpacity(0.15),
+                              color: color.withValues(alpha: 0.15),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(icon, color: color, size: 20),
@@ -252,7 +251,7 @@ class _ContractorNotificationsScreenState
                                   n['message'] ?? '',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Colors.white.withOpacity(0.6),
+                                    color: Colors.white.withValues(alpha: 0.6),
                                     height: 1.4,
                                   ),
                                 ),
@@ -267,7 +266,7 @@ class _ContractorNotificationsScreenState
                                 _timeAgo(n['timeStamp']),
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.white.withOpacity(0.4),
+                                  color: Colors.white.withValues(alpha: 0.4),
                                 ),
                               ),
                               if (isUnread) ...[

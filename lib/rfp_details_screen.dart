@@ -64,10 +64,11 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
 
   Future<void> _openFile(String? url) async {
     if (url == null || url.isEmpty) {
-      if (mounted)
+      if (mounted){
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('No file URL available')));
+      }
       return;
     }
     try {
@@ -76,10 +77,11 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
       try {
         await launchUrl(Uri.parse(url), mode: LaunchMode.platformDefault);
       } catch (_) {
-        if (mounted)
+        if (mounted){
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(const SnackBar(content: Text('Could not open file')));
+          }
       }
     }
   }
@@ -121,7 +123,7 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha:0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.close, color: Colors.red, size: 30),
@@ -361,9 +363,9 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.green.withOpacity(0.1),
+          color: Colors.green.withValues(alpha:0.1),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.green.withOpacity(0.3)),
+          border: Border.all(color: Colors.green.withValues(alpha:0.3)),
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -463,7 +465,7 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withValues(alpha:0.2),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
@@ -534,7 +536,7 @@ class _RFPDetailsScreenState extends State<RFPDetailsScreen> {
   }) => Container(
     height: 55,
     decoration: BoxDecoration(
-      color: btnColor ?? color.withOpacity(0.1),
+      color: btnColor ?? color.withValues(alpha:0.1),
       borderRadius: BorderRadius.circular(12),
     ),
     child: InkWell(

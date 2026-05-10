@@ -265,7 +265,7 @@ class _ContractorDashboardScreenState
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 3),
                           decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.15),
+                            color: Colors.blue.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
@@ -417,7 +417,7 @@ class _ContractorDashboardScreenState
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.2),
+                        color: Colors.blue.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -553,7 +553,7 @@ class _ProjectCard extends StatelessWidget {
     decoration: BoxDecoration(
       color: const Color(0xFF1E212A),
       borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: Colors.green.withOpacity(0.2)),
+      border: Border.all(color: Colors.green.withValues(alpha: 0.2)),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -566,7 +566,7 @@ class _ProjectCard extends StatelessWidget {
               padding:
                   const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.15),
+                color: Colors.green.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Text(
@@ -630,7 +630,7 @@ class _QuickActionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF1A2C47),
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.blue.withOpacity(0.3)),
+        border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -678,7 +678,7 @@ class _BidRow extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.blue.shade900.withOpacity(0.3),
+              color: Colors.blue.shade900.withValues(alpha: 0.3),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(Icons.work_outline,
@@ -698,7 +698,7 @@ class _BidRow extends StatelessWidget {
                 Text('Deadline: $deadline',
                     style: TextStyle(
                         fontSize: 13,
-                        color: Colors.white.withOpacity(0.5))),
+                        color: Colors.white.withValues(alpha: 0.5))),
                 if (budget != null) ...[
                   const SizedBox(height: 2),
                   Text('Budget: \$$budget',
@@ -711,7 +711,7 @@ class _BidRow extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
+                      color: Colors.blue.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(tag!,

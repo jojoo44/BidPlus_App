@@ -196,7 +196,7 @@ class _RFPSelectorScreenState extends State<RFPSelectorScreen> {
                               color: cardColor,
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.06),
+                                color: Colors.white.withValues(alpha:0.06),
                               ),
                             ),
                             child: Column(
@@ -223,7 +223,7 @@ class _RFPSelectorScreenState extends State<RFPSelectorScreen> {
                                       decoration: BoxDecoration(
                                         color: _statusColor(
                                           status,
-                                        ).withOpacity(0.15),
+                                        ).withValues(alpha:0.15),
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
@@ -250,7 +250,7 @@ class _RFPSelectorScreenState extends State<RFPSelectorScreen> {
                                         vertical: 5,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: primaryBlue.withOpacity(0.12),
+                                        color: primaryBlue.withValues(alpha:0.12),
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Row(

@@ -257,7 +257,7 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
         decoration: BoxDecoration(
           color: surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.2)),
+          border: Border.all(color: color.withValues(alpha:0.2)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -311,7 +311,7 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
         decoration: BoxDecoration(
           color: surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: statusColor.withOpacity(0.15)),
+          border: Border.all(color: statusColor.withValues(alpha:0.15)),
         ),
         child: Column(
           children: [
@@ -320,7 +320,7 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: primaryPurple.withOpacity(0.1),
+                    color: primaryPurple.withValues(alpha:0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
@@ -363,10 +363,10 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
                                     vertical: 2,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: accentBlue.withOpacity(0.1),
+                                    color: accentBlue.withValues(alpha:0.1),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
-                                      color: accentBlue.withOpacity(0.3),
+                                      color: accentBlue.withValues(alpha:0.3),
                                     ),
                                   ),
                                   child: Text(
@@ -393,7 +393,7 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.15),
+                        color: statusColor.withValues(alpha:0.15),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(

@@ -1,4 +1,6 @@
 // topsis_service.dart
+// ignore_for_file: file_names
+
 import 'dart:math';
 
 class TopsisResult {

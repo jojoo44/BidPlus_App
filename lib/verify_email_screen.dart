@@ -153,7 +153,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
           if (_resendCooldown <= 0) t.cancel();
         });
       });
-
+// ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Code resent! Check your email.'),
@@ -166,6 +166,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
       _clearBoxes();
     } on AuthException catch (e) {
+      // ignore: use_build_context_synchronously
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.message),
@@ -273,11 +274,11 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                 ),
 
                 decoration: BoxDecoration(
-                  color: Colors.redAccent.withOpacity(0.1),
+                  color: Colors.redAccent.withValues(alpha:0.1),
 
                   borderRadius: BorderRadius.circular(10),
 
-                  border: Border.all(color: Colors.redAccent.withOpacity(0.4)),
+                  border: Border.all(color: Colors.redAccent.withValues(alpha:0.4)),
                 ),
 
                 child: Row(
@@ -377,7 +378,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
         border: Border.all(
           color: _hasError
-              ? Colors.redAccent.withOpacity(0.6)
+              ? Colors.redAccent.withValues(alpha:0.6)
               : Colors.transparent,
         ),
       ),

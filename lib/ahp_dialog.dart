@@ -94,9 +94,11 @@ class _AHPDialogState extends State<AHPDialog> {
             final nameC = widget.criteria[c];
             final abWinner = ab >= 1 ? nameA : nameB;
             final abLoser = ab >= 1 ? nameB : nameA;
+            // ignore: unused_local_variable
             final abVal = (ab >= 1 ? ab : 1 / ab).clamp(1.0, 9.0);
             final bcWinner = bc >= 1 ? nameB : nameC;
             final bcLoser = bc >= 1 ? nameC : nameB;
+            // ignore: unused_local_variable
             final bcVal = (bc >= 1 ? bc : 1 / bc).clamp(1.0, 9.0);
             final expWinner = expected >= 1 ? nameA : nameC;
             final expLoser = expected >= 1 ? nameC : nameA;
@@ -109,8 +111,8 @@ class _AHPDialogState extends State<AHPDialog> {
                 : '  → $expWinner should be more important than $expLoser by ${expVal.toStringAsFixed(0)}×\n  ← adjust "$nameA vs $nameC"';
             hints.add(
               '• You said $abWinner is more important than $abLoser by \${abVal.toStringAsFixed(0)}×\n'
-                      '  and $bcWinner is more important than $bcLoser by \${bcVal.toStringAsFixed(0)}×\n' +
-                  expMsg,
+                      '  and $bcWinner is more important than $bcLoser by \${bcVal.toStringAsFixed(0)}×\n' 
+                  '$expMsg',
             );
           }
         }
@@ -121,10 +123,11 @@ class _AHPDialogState extends State<AHPDialog> {
 
   List<(int, int)> get _pairs {
     final pairs = <(int, int)>[];
-    for (int i = 0; i < n; i++)
+    for (int i = 0; i < n; i++){
       for (int j = i + 1; j < n; j++) {
         pairs.add((i, j));
       }
+    }
     return pairs;
   }
 
@@ -152,7 +155,7 @@ class _AHPDialogState extends State<AHPDialog> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: primaryBlue.withOpacity(0.15),
+                      color: primaryBlue.withValues(alpha:0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(Icons.balance, color: primaryBlue, size: 18),
@@ -252,8 +255,8 @@ class _AHPDialogState extends State<AHPDialog> {
                               color: equal
                                   ? Colors.white12
                                   : (leftWins
-                                        ? primaryBlue.withOpacity(0.2)
-                                        : greenColor.withOpacity(0.2)),
+                                        ? primaryBlue.withValues(alpha: 0.2)
+                                        : greenColor.withValues(alpha: 0.2)),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
@@ -293,7 +296,7 @@ class _AHPDialogState extends State<AHPDialog> {
                               : (rightWins ? greenColor : Colors.white30),
                           inactiveTrackColor: Colors.white12,
                           thumbColor: Colors.white,
-                          overlayColor: primaryBlue.withOpacity(0.2),
+                          overlayColor: primaryBlue.withValues(alpha: 0.2),
                           trackHeight: 4,
                           thumbShape: const RoundSliderThumbShape(
                             enabledThumbRadius: 8,
@@ -320,7 +323,7 @@ class _AHPDialogState extends State<AHPDialog> {
                             Text(
                               '← More',
                               style: TextStyle(
-                                color: primaryBlue.withOpacity(0.7),
+                                color: primaryBlue.withValues(alpha: 0.7),
                                 fontSize: 10,
                               ),
                             ),
@@ -334,7 +337,7 @@ class _AHPDialogState extends State<AHPDialog> {
                             Text(
                               'More →',
                               style: TextStyle(
-                                color: greenColor.withOpacity(0.7),
+                                color: greenColor.withValues(alpha: 0.7),
                                 fontSize: 10,
                               ),
                             ),
@@ -357,8 +360,8 @@ class _AHPDialogState extends State<AHPDialog> {
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: _result!.isConsistent
-                          ? greenColor.withOpacity(0.4)
-                          : redColor.withOpacity(0.4),
+                          ? greenColor.withValues(alpha: 0.4)
+                          : redColor.withValues(alpha: 0.4),
                     ),
                   ),
                   child: Column(
@@ -401,7 +404,7 @@ class _AHPDialogState extends State<AHPDialog> {
                               Text(
                                 'Review your comparisons (CR must be < 0.10)',
                                 style: TextStyle(
-                                  color: redColor.withOpacity(0.8),
+                                  color: redColor.withValues(alpha: 0.8),
                                   fontSize: 11,
                                 ),
                               ),
@@ -416,7 +419,7 @@ class _AHPDialogState extends State<AHPDialog> {
                                     color: const Color(0xFF1A1A2E),
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(
-                                      color: redColor.withOpacity(0.3),
+                                      color: redColor.withValues(alpha: 0.3),
                                     ),
                                   ),
                                   child: Text(

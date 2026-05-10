@@ -225,7 +225,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         color: const Color(0xFF1A2C47),
                         borderRadius: BorderRadius.circular(12),
                         border: isUnread
-                            ? Border.all(color: color.withOpacity(0.3))
+                            ? Border.all(color: color.withValues(alpha:0.3))
                             : null,
                       ),
                       child: Row(
@@ -233,7 +233,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           Container(
                             padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: color.withOpacity(0.15),
+                              color: color.withValues(alpha:0.15),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(icon, color: color, size: 20),
@@ -258,7 +258,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                   n['message'] ?? '',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Colors.white.withOpacity(0.6),
+                                    color: Colors.white.withValues(alpha:0.6),
                                     height: 1.4,
                                   ),
                                 ),
@@ -273,7 +273,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 _timeAgo(n['timeStamp']),
                                 style: TextStyle(
                                   fontSize: 11,
-                                  color: Colors.white.withOpacity(0.4),
+                                  color: Colors.white.withValues(alpha:0.4),
                                 ),
                               ),
                               if (isUnread) ...[

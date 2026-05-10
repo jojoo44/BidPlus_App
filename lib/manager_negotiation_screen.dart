@@ -216,9 +216,9 @@ class _ManagerNegotiationScreenState extends State<ManagerNegotiationScreen> {
         if (isCompleted)
           Container(
             margin: const EdgeInsets.all(12), padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: Colors.green.withOpacity(0.1),
+            decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green.withOpacity(0.3))),
+                border: Border.all(color: Colors.green.withValues(alpha: 0.3))),
             child: const Row(children: [
               Icon(Icons.check_circle, color: Colors.greenAccent, size: 18),
               SizedBox(width: 10),
@@ -231,7 +231,7 @@ class _ManagerNegotiationScreenState extends State<ManagerNegotiationScreen> {
               ? const Center(child: CircularProgressIndicator(color: accent))
               : _rounds.isEmpty
               ? Center(child: Text('Start the negotiation',
-                  style: TextStyle(color: Colors.white.withOpacity(0.4))))
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.4))))
               : ListView.builder(
                   controller: _scrollCtrl, padding: const EdgeInsets.all(16),
                   itemCount: _rounds.length,
@@ -254,7 +254,7 @@ class _ManagerNegotiationScreenState extends State<ManagerNegotiationScreen> {
                 maxLines: null, textInputAction: TextInputAction.send,
                 onSubmitted: _sendMessage,
                 decoration: InputDecoration(
-                  hintText: 'Type a message...', hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
+                  hintText: 'Type a message...', hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4)),
                   filled: true, fillColor: cardColor,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -274,6 +274,7 @@ class _ManagerNegotiationScreenState extends State<ManagerNegotiationScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _infoChip(IconData icon, String text) => Row(mainAxisSize: MainAxisSize.min, children: [
     Icon(icon, color: Colors.white54, size: 14), const SizedBox(width: 5),
     Text(text, style: const TextStyle(color: Colors.white70, fontSize: 12), overflow: TextOverflow.ellipsis),

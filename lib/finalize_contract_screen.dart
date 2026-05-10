@@ -143,6 +143,8 @@ class _InfoTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const stroke = Color(0xFF22314A);
+  
+    // ignore: unused_local_variable
     const hint = Color(0xFF7F8EA3);
 
     return Container(

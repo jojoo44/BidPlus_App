@@ -76,10 +76,11 @@ class _ManagerProposalDetailsScreenState
 
   Future<void> _openFile(String url) async {
     if (url.isEmpty) {
-      if (mounted)
+      if (mounted){
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('No file URL available')));
+        }
       return;
     }
     try {
@@ -88,10 +89,10 @@ class _ManagerProposalDetailsScreenState
       try {
         await launchUrl(Uri.parse(url), mode: LaunchMode.platformDefault);
       } catch (_) {
-        if (mounted)
+        if (mounted){
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('Could not open file')));
+          ).showSnackBar(const SnackBar(content: Text('Could not open file')));}
       }
     }
   }
@@ -294,10 +295,10 @@ class _ManagerProposalDetailsScreenState
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: _statusColor(_status).withOpacity(0.1),
+                color: _statusColor(_status).withValues(alpha:0.1),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: _statusColor(_status).withOpacity(0.3),
+                  color: _statusColor(_status).withValues(alpha:0.3),
                 ),
               ),
               child: _status.toLowerCase() == 'accepted'
@@ -328,10 +329,10 @@ class _ManagerProposalDetailsScreenState
                             vertical: 5,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.purple.withOpacity(0.2),
+                            color: Colors.purple.withValues(alpha:0.2),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: Colors.purple.withOpacity(0.4),
+                              color: Colors.purple.withValues(alpha:0.4),
                             ),
                           ),
                           child: const Row(
@@ -477,7 +478,7 @@ class _ManagerProposalDetailsScreenState
                                 decoration: BoxDecoration(
                                   color: _fileColor(
                                     uploadType,
-                                  ).withOpacity(0.1),
+                                  ).withValues(alpha:0.1),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Icon(
@@ -581,7 +582,7 @@ class _ManagerProposalDetailsScreenState
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.15),
+                              color: Colors.blue.withValues(alpha:0.15),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
@@ -694,12 +695,12 @@ class _ManagerProposalDetailsScreenState
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: blue.withOpacity(0.15),
+                    backgroundColor: blue.withValues(alpha:0.15),
                     foregroundColor: blue,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: blue.withOpacity(0.5)),
+                      side: BorderSide(color: blue.withValues(alpha:0.5)),
                     ),
                     elevation: 0,
                   ),

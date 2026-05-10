@@ -60,6 +60,7 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
   List<TextEditingController> weightControllers = [];
 
   bool _ahpApplied = false;
+  //ignore: unused_field
   double? _lastCR;
 
   final List<Map<String, String>> _tags = [
@@ -139,10 +140,11 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
       try {
         await launchUrl(Uri.parse(url), mode: LaunchMode.platformDefault);
       } catch (_) {
-        if (mounted)
+        if (mounted){
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(const SnackBar(content: Text('Could not open file')));
+          }
       }
     }
   }
@@ -177,6 +179,7 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
       _ahpApplied = true;
     });
 
+// ignore: use_build_context_synchronously
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text('✓ Weights applied successfully'),
@@ -226,18 +229,19 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
           _uploadedUrls.add(publicUrl);
         });
       }
-      if (mounted)
+      if (mounted){
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Files uploaded!'),
             backgroundColor: Colors.green,
           ),
-        );
+        );}
     } catch (e) {
-      if (mounted)
+      if (mounted){
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+        }
     } finally {
       if (mounted) setState(() => _isUploadingFile = false);
     }
@@ -351,15 +355,16 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
         }
       }
     } on PostgrestException catch (e) {
-      if (mounted)
+      if (mounted){
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error: ${e.message}')));
+        }
     } catch (e) {
-      if (mounted)
+      if (mounted){
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));}
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -475,13 +480,13 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: _ahpApplied
-                          ? greenColor.withOpacity(0.15)
-                          : primaryBlue.withOpacity(0.15),
+                          ? greenColor.withValues(alpha: 0.15)
+                          : primaryBlue.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: _ahpApplied
-                            ? greenColor.withOpacity(0.5)
-                            : primaryBlue.withOpacity(0.5),
+                            ? greenColor.withValues(alpha: 0.5)
+                            : primaryBlue.withValues(alpha: 0.5),
                       ),
                     ),
                     child: Row(
@@ -516,7 +521,7 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
                 child: Text(
                   'Weights set by AHP — you can still adjust them manually',
                   style: TextStyle(
-                    color: greenColor.withOpacity(0.7),
+                    color: greenColor.withValues(alpha: 0.7),
                     fontSize: 11,
                   ),
                 ),
