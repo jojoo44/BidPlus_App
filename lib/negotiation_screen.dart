@@ -21,6 +21,7 @@ class AINegotiationScreen extends StatefulWidget {
   final bool isManager;
   final String? rfpDescription;
   final String? rfpScope;
+  final bool fromDashboard; // ← جديد
 
   const AINegotiationScreen({
     super.key,
@@ -34,6 +35,7 @@ class AINegotiationScreen extends StatefulWidget {
     this.budget,
     this.rfpDescription,
     this.rfpScope,
+    this.fromDashboard = false, // ← جديد
   });
 
   @override
@@ -623,6 +625,8 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
         await supabase.from('Contract').update({'status': 'Active'}).eq('id', _contractId!);
         final sid = int.tryParse(widget.sessionId) ?? widget.sessionId;
         await supabase.from('NegoSession').update({'status': 'Completed', 'end_date': DateTime.now().toIso8601String()}).eq('session_id', sid);
+        // ← تحديث status الـ RFP لـ Completed
+        await supabase.from('RFP').update({'status': 'Completed'}).eq('rfpID', int.tryParse(widget.rfpId) ?? 0);
         await _notifyOtherParty('Contract Active', 'The contract for "${widget.rfpTitle}" is finalized by both parties. Project is now active!');
         if (mounted) {
           setState(() {
@@ -716,19 +720,27 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        // ← السهم يرجع لصفحة البروبوزال
         leading: IconButton(
-  icon: const Icon(Icons.arrow_back, color: Colors.white),
-  onPressed: () {
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ProposalsListScreen(rfpId: widget.rfpId),
-      ),
-      (route) => route.isFirst,
-    );
-  },
-),
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            // ← إذا جاء من الداش بورد يرجع للداش بورد، وإلا يرجع للبروبوزل
+            if (widget.fromDashboard) {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const BidPlus()),
+                (route) => false,
+              );
+            } else {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ProposalsListScreen(rfpId: widget.rfpId),
+                ),
+                (route) => route.isFirst,
+              );
+            }
+          },
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -736,7 +748,6 @@ class _AINegotiationScreenState extends State<AINegotiationScreen> {
             Text('${widget.contractorName} • $_sessionStatus', style: TextStyle(color: isCompleted ? Colors.greenAccent : Colors.orangeAccent, fontSize: 11)),
           ],
         ),
-        // ← أيقونة الهوم ترجع للداش بورد
         actions: [
           IconButton(
             icon: const Icon(Icons.home_rounded, color: Colors.white70, size: 24),

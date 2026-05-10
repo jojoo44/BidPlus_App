@@ -1,3 +1,4 @@
+// dashboard.dart
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'profile_screen.dart';
@@ -227,18 +228,12 @@ class _BidPlusState extends State<BidPlus> {
               const SizedBox(height: 30),
               Row(
                 children: [
-                  _buildStatCard(
-                    context,
-                    "Active",
-                    _activeCount.toString(),
-                    cardColor,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ActiveRFPDetailsScreen(),
-                      ),
-                    ),
-                  ),
+                 _buildStatCard(
+  context,
+  "Active",
+  _activeCount.toString(),
+  cardColor,
+),
                   const SizedBox(width: 15),
                   _buildStatCard(
                     context,

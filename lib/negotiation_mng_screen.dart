@@ -54,7 +54,6 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
       final enriched = <Map<String, dynamic>>[];
       for (final session in sessionsData) {
         final rfpId = session['rfp_id'] as int?;
-        // ← الجديد: جيب contractor_id من NegoSession مباشرة
         final contractorId = session['contractor_id']?.toString() ?? '';
 
         Map<String, dynamic> rfpInfo = {};
@@ -85,7 +84,6 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
           } catch (_) {}
         }
 
-        // ← الجديد: جيب اسم الكونتراكتر من contractor_id في NegoSession
         String contractorName = 'Unknown';
         String proposalId = '';
 
@@ -99,7 +97,6 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
             contractorName = user?['username'] ?? 'Unknown';
           } catch (_) {}
 
-          // جيب الـ proposalId
           if (rfpId != null) {
             try {
               final proposal = await supabase
@@ -112,7 +109,6 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
             } catch (_) {}
           }
         } else {
-          // ← fallback لو contractor_id فاضي (sessions قديمة)
           if (rfpId != null) {
             try {
               final proposals = await supabase
@@ -305,6 +301,7 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
             proposalId: session['proposalId'] ?? '',
             selectedCriteria: criteria,
             isManager: true,
+            fromDashboard: true, // ← جديد: جاء من الداش بورد
           ),
         ),
       ).then((_) => _loadSessions()),
@@ -471,18 +468,8 @@ class _NegotiationArchiveScreenState extends State<NegotiationArchiveScreen> {
     try {
       final dt = DateTime.parse(d);
       const m = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec',
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
       ];
       return '${m[dt.month - 1]} ${dt.day}, ${dt.year}';
     } catch (_) {
