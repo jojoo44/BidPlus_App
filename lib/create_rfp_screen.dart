@@ -1,3 +1,4 @@
+// create_rfp_screen.dart
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
@@ -460,13 +461,13 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: _ahpApplied
-                          ? greenColor.withOpacity(0.15)
-                          : primaryBlue.withOpacity(0.15),
+                          ? greenColor.withValues(alpha:0.15)
+                          : primaryBlue.withValues(alpha:0.15),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: _ahpApplied
-                            ? greenColor.withOpacity(0.5)
-                            : primaryBlue.withOpacity(0.5),
+                            ? greenColor.withValues(alpha:0.5)
+                            : primaryBlue.withValues(alpha:0.5),
                       ),
                     ),
                     child: Row(
@@ -501,7 +502,7 @@ class _CreateRFPScreenState extends State<CreateRFPScreen> {
                 child: Text(
                   'Weights set by AHP — you can still adjust them manually',
                   style: TextStyle(
-                    color: greenColor.withOpacity(0.7),
+                    color: greenColor.withValues(alpha:0.7),
                     fontSize: 11,
                   ),
                 ),
