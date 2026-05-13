@@ -194,27 +194,42 @@ class AccountActionsDialogs {
                             final userId = supabase.auth.currentUser?.id;
                             if (userId == null) throw Exception('User not found');
 
+                            // ✅ مانجر: شيك RFP Active
                             final activeRFPs = await supabase
                                 .from('RFP')
                                 .select('rfpID')
                                 .eq('creatorUser', userId)
                                 .eq('status', 'Active');
 
+                            // ✅ مانجر: شيك NegoRounds
+                            final activeNegoManager = await supabase
+                                .from('NegoRounds')
+                                .select('roundID')
+                                .eq('manager_id', userId);
+
+                            // ✅ كونتراكتور: شيك NegoSession Active
                             final activeNegoContractor = await supabase
                                 .from('NegoSession')
                                 .select('session_id')
                                 .eq('contractor_id', userId)
                                 .eq('status', 'Active');
 
-                            final activeNegoManager = await supabase
-                                .from('NegoRounds')
-                                .select('roundID')
-                                .eq('manager_id', userId);
+                            // ✅ كونتراكتور: شيك proposals بحالات نشطة
+                            final activeProposals = await supabase
+                                .from('proposals')
+                                .select('ProposalID')
+                                .eq('submitterUserId', userId)
+                                .inFilter('status', [
+                                  'Submitted',
+                                  'Under Review',
+                                  'Accepted',
+                                ]);
 
                             final bool hasActive =
                                 (activeRFPs as List).isNotEmpty ||
+                                (activeNegoManager as List).isNotEmpty ||
                                 (activeNegoContractor as List).isNotEmpty ||
-                                (activeNegoManager as List).isNotEmpty;
+                                (activeProposals as List).isNotEmpty;
 
                             if (hasActive) {
                               setDialogState(() => isDeleting = false);
